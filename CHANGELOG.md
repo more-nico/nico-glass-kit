@@ -41,6 +41,20 @@
 - Chromatic dispersion is now high tier only, as documented in `optics.ts`;
   Medium renders a single displacement pass (~40% fewer graph primitives).
   Explicitly opt into `quality="high"` for the full dispersion look.
+- Displacement maps are now rasterised at a configurable scale
+  (`GlassProvider.lensMapRasterScale`, default `0.2`, adjustable `0.1`–`0.5`;
+  the playground exposes it under Performance). The in-memory pixel buffer
+  keeps its full physical size — filters, `setLensMapObserver` and the RGBA
+  encoding contract are unchanged — while the PNG handed to `feImage` is
+  downsampled and stretched back over the element box by the filter. Backdrop
+  `url()` compositor preparation scales with the map raster size: with 25
+  High-tier surfaces in a 4K window over an animated wallpaper, measured
+  frame rate rose from 59–66 to ~120 fps at the default. The trade-off was
+  quantified at the gentler `0.5` cap before adoption (1.7–7.3 % of rendered
+  pixels per surface differ from the full-resolution render, mean
+  1.6–4.4/255, max 25–40/255 at the refraction rim; two identical captures
+  differ by 0.1 %, max 1/255); the default was then lowered to `0.2` after
+  the owner reviewed the captures and found the difference imperceptible.
 
 ### Notes / limitations
 
@@ -155,3 +169,11 @@ The control panel is grouped into 渲染 Quality / 背景 Background /
 材质 Material / 折射 Refraction / 交互 Interaction / 形状 Shape / 预设
 Presets, with the ported defaults and reference presets (含蓄 Subtle /
 默认 Default / 清透 Clear / 夸张 Vivid).
+
+- The Device frame's bottom tab bar now tints its selected slot with the
+  opposite mode of the glass beneath it: a dark active capsule over a light
+  backdrop, the default light capsule over a dark one. The stacked feed
+  buttons re-probe the changed pill automatically (the scheduler forwards
+  `data-ngs-light` flips), and the active button's content is pinned to
+  `--ngs-text` light so it stays legible even when `overLight` is forced or
+  during the probe throttle window.

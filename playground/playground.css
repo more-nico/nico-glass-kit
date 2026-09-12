@@ -910,6 +910,23 @@ code {
   line-height: 14px;
 }
 
+/* 选中槽位底衬胶囊与玻璃底反向取色：浅色玻璃底 → 深色胶囊（深色底 → 组件默认浅色
+   胶囊，无需覆盖）。胶囊夹在 TabBar 玻璃面与其上的信息源 GlassButton 之间，按钮的
+   逐元素 overLight 探测会读到胶囊颜色并自动翻转图标/文字；调度器放行 data-ngs-light
+   翻转，因此不需要 JS。
+   不要给 background 加 transition：过渡中间色会被探测采样，导致按钮模式锁死
+   （见 .phone-frame .ngs-tab 的过渡注释）。 */
+.phone-frame .ngs-tabbar[data-ngs-light='true'] .ngs-tab--active {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* 激活按钮内容钉成浅色：强制 overLight={true} 时按钮自身不会随胶囊翻色，且自动模式
+   探测有 ~120ms 节流窗口；显式覆盖保证深色胶囊上恒定可读（自动模式下按钮本就会探测
+   成白色，此规则结果一致、无副作用）。 */
+.phone-frame .ngs-tabbar[data-ngs-light='true'] ~ .feed-tab-btn[aria-pressed='true'] {
+  --ngs-text: rgba(255, 255, 255, 0.7);
+}
+
 /* 底部信息源按钮：独立玻璃层逐片叠在 GlassTabBar 之上（z 101 > bar 的 100）。
    按钮 85×64 与槽位完全同尺寸（中心 y=53，bottom 21），激活高亮胶囊正好藏在
    按钮玻璃正后方，不会露出叠层边缘；bar 与按钮同为 7px 内缩网格。
@@ -1233,22 +1250,23 @@ code {
 
 /* ---------- fps hud ---------- */
 
+/* Positioning only — the glass fill, radius and padding come from GlassCard;
+   .pg-fps-row carries the layout/typography. Pointer events stay enabled so
+   the surface's elasticity spring and rim glint react like any other card. */
 .pg-fps {
   position: fixed;
   left: 16px;
   bottom: 16px;
   z-index: 400;
+  user-select: none;
+}
+
+.pg-fps-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(10, 12, 18, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.12);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  user-select: none;
 }
 
 .pg-fps-num {
@@ -1258,22 +1276,35 @@ code {
   color: #4ade80;
 }
 
-.pg-fps[data-level='ok'] .pg-fps-num {
+.pg-fps-row[data-level='ok'] .pg-fps-num {
   color: #facc15;
 }
 
-.pg-fps[data-level='bad'] .pg-fps-num {
+.pg-fps-row[data-level='bad'] .pg-fps-num {
   color: #f87171;
+}
+
+/* Light-backdrop palette, keyed off the surface's data-ngs-light. */
+.pg-fps[data-ngs-light='true'] .pg-fps-num {
+  color: #15803d;
+}
+
+.pg-fps[data-ngs-light='true'] .pg-fps-row[data-level='ok'] .pg-fps-num {
+  color: #a16207;
+}
+
+.pg-fps[data-ngs-light='true'] .pg-fps-row[data-level='bad'] .pg-fps-num {
+  color: #b91c1c;
 }
 
 .pg-fps-unit {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ngs-text-dim);
 }
 
 .pg-fps-ms {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--ngs-text-dim);
   min-width: 74px;
   text-align: right;
 }

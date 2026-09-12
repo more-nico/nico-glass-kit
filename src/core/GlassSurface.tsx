@@ -1,4 +1,5 @@
 import {
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -12,6 +13,7 @@ import {
 import { useGlassQuality, type GlassQuality } from './useGlassQuality';
 import { useOverLight, type OverLight } from './useOverLight';
 import { useGlassFilter } from './SvgFilterRegistry';
+import { GlassConfigContext } from './GlassProvider';
 import { DEFAULT_OPTICS, resolveOptics, type GlassOptics } from './optics';
 
 export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
@@ -95,6 +97,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
   } = props;
 
   const resolvedQuality = useGlassQuality(quality);
+  const provider = useContext(GlassConfigContext);
   const containerRef = useRef<HTMLElement | null>(null);
   const light = useOverLight(overLight, containerRef);
   const material = useMemo(() => resolveOptics(DEFAULT_OPTICS, optics), [optics]);
@@ -156,6 +159,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
       curvature: material.curvature,
       strength: material.refraction,
       dpr,
+      rasterScale: provider.lensMapRasterScale,
     },
     blur: material.blur,
     saturation: material.saturation,

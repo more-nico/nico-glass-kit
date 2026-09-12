@@ -19,6 +19,9 @@ export {
   generateLensMap,
   clearLensMapCache,
   lensMapCacheStats,
+  DEFAULT_LENS_MAP_RASTER_SCALE,
+  MIN_LENS_MAP_RASTER_SCALE,
+  MAX_LENS_MAP_RASTER_SCALE,
 } from './core/displacementMap';
 export type { LensMapOptions, LensMapResult } from './core/displacementMap';
 

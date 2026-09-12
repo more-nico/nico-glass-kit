@@ -14,6 +14,31 @@
 export const MAX_DISPLACEMENT_PX = 24;
 export const LENS_MAP_CACHE_LIMIT = 32;
 
+/**
+ * Default raster scale of the PNG handed to `feImage`. The in-memory pixel
+ * buffer stays at the full physical resolution (`pixelWidth`/`pixelHeight`);
+ * only the exported image is downsampled and the filter stretches it back
+ * over the element box (`preserveAspectRatio="none"`). Compositor frame
+ * preparation for backdrop `url()` filters scales with the feImage raster
+ * size: at 4K on 25 High-tier surfaces, measured frame rate went from 59–66
+ * (full resolution) to ~120 fps at this scale. The trade-off is a slightly
+ * smoothed normal field; the owner accepted the difference after inspecting
+ * side-by-side captures.
+ */
+export const DEFAULT_LENS_MAP_RASTER_SCALE = 0.2;
+
+/** Lower bound accepted for {@link LensMapOptions.rasterScale}. */
+export const MIN_LENS_MAP_RASTER_SCALE = 0.1;
+
+/** Upper bound accepted for {@link LensMapOptions.rasterScale}. */
+export const MAX_LENS_MAP_RASTER_SCALE = 0.5;
+
+/** Clamps a caller-provided raster scale into the supported range. */
+export function clampLensMapRasterScale(scale: number | undefined): number {
+  if (scale === undefined || !Number.isFinite(scale)) return DEFAULT_LENS_MAP_RASTER_SCALE;
+  return Math.min(MAX_LENS_MAP_RASTER_SCALE, Math.max(MIN_LENS_MAP_RASTER_SCALE, scale));
+}
+
 export interface LensMapOptions {
   /** CSS px. */
   width: number;
@@ -31,6 +56,13 @@ export interface LensMapOptions {
   quality?: number;
   /** Device pixel ratio; used as the default quality. */
   dpr?: number;
+  /**
+   * Raster scale of the exported PNG data URL; defaults to
+   * {@link DEFAULT_LENS_MAP_RASTER_SCALE} and is clamped into
+   * [{@link MIN_LENS_MAP_RASTER_SCALE}, {@link MAX_LENS_MAP_RASTER_SCALE}].
+   * The in-memory pixel buffer is unaffected.
+   */
+  rasterScale?: number;
   /** Skip the PNG data URL (useful in tests / non-DOM environments). */
   skipDataUrl?: boolean;
 }
@@ -42,6 +74,8 @@ export interface LensMapResult {
   pixelWidth: number;
   pixelHeight: number;
   quality: number;
+  /** Raster scale applied to the PNG data URL; `pixels` stays full-size. */
+  rasterScale: number;
   /** Value to pass to `feDisplacementMap@scale`. */
   maxScale: number;
   /** RGBA pixels at physical resolution. */
@@ -101,6 +135,7 @@ export interface NormalisedLensShape {
   edge: number;
   curvature: number;
   strength: number;
+  rasterScale: number;
 }
 
 export function normaliseLensOptions(options: LensMapOptions): NormalisedLensShape {
@@ -120,6 +155,7 @@ export function normaliseLensOptions(options: LensMapOptions): NormalisedLensSha
     edge: Math.max(0.5, options.edge * quality),
     curvature: clamp(options.curvature, 0, 1),
     strength: clamp(options.strength, 0, 1),
+    rasterScale: clampLensMapRasterScale(options.rasterScale),
   };
 }
 
@@ -133,6 +169,7 @@ export function lensMapCacheKey(options: LensMapOptions): string {
     `p:${round(shape.curvature, 4)}`,
     `s:${round(shape.strength, 4)}`,
     `q:${round(shape.quality, 3)}`,
+    `m:${round(shape.rasterScale, 3)}`,
   ].join(':');
 }
 
@@ -212,21 +249,52 @@ export function computeLensPixels(options: LensMapOptions): Uint8ClampedArray {
   return pixels;
 }
 
-/** Rasterise RGBA pixels into a PNG data URL when a DOM canvas is available. */
+/** Physical size of the exported PNG for a full-resolution pixel buffer. */
+export function lensMapRasterSize(
+  pixelWidth: number,
+  pixelHeight: number,
+  scale: number = DEFAULT_LENS_MAP_RASTER_SCALE,
+): { width: number; height: number } {
+  const rasterScale = clampLensMapRasterScale(scale);
+  return {
+    width: Math.max(1, Math.round(pixelWidth * rasterScale)),
+    height: Math.max(1, Math.round(pixelHeight * rasterScale)),
+  };
+}
+
+/**
+ * Rasterise the full-resolution pixel buffer into a PNG data URL, downsampled
+ * to `scale` when a DOM canvas is available.
+ */
 export function renderPixelsToDataUrl(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
+  scale: number = DEFAULT_LENS_MAP_RASTER_SCALE,
 ): string {
   try {
     if (typeof document !== 'undefined') {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return '';
-      ctx.putImageData(new ImageData(pixels, width, height), 0, 0);
-      return canvas.toDataURL('image/png');
+      const source = document.createElement('canvas');
+      source.width = width;
+      source.height = height;
+      const sourceCtx = source.getContext('2d');
+      if (!sourceCtx) return '';
+      sourceCtx.putImageData(new ImageData(pixels, width, height), 0, 0);
+
+      const raster = lensMapRasterSize(width, height, scale);
+      if (raster.width === width && raster.height === height) {
+        return source.toDataURL('image/png');
+      }
+
+      const target = document.createElement('canvas');
+      target.width = raster.width;
+      target.height = raster.height;
+      const targetCtx = target.getContext('2d');
+      if (!targetCtx) return '';
+      targetCtx.imageSmoothingEnabled = true;
+      targetCtx.imageSmoothingQuality = 'high';
+      targetCtx.drawImage(source, 0, 0, raster.width, raster.height);
+      return target.toDataURL('image/png');
     }
   } catch {
     return '';
@@ -255,7 +323,7 @@ export function generateLensMap(options: LensMapOptions): LensMapResult {
   const pixels = computeLensPixels(options);
   const dataUrl = options.skipDataUrl
     ? ''
-    : renderPixelsToDataUrl(pixels, shape.pixelWidth, shape.pixelHeight);
+    : renderPixelsToDataUrl(pixels, shape.pixelWidth, shape.pixelHeight, shape.rasterScale);
   const result: LensMapResult = {
     cacheKey: key,
     width: shape.width,
@@ -263,6 +331,7 @@ export function generateLensMap(options: LensMapOptions): LensMapResult {
     pixelWidth: shape.pixelWidth,
     pixelHeight: shape.pixelHeight,
     quality: shape.quality,
+    rasterScale: shape.rasterScale,
     maxScale: shape.strength * MAX_DISPLACEMENT_PX * (255 / 127),
     pixels,
     dataUrl,

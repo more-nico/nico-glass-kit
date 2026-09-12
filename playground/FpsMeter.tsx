@@ -1,10 +1,15 @@
 import { useEffect, useRef } from 'react';
+import { GlassCard } from 'nico-glass-kit';
+import type { DemoParams } from './App';
+import { glassProps } from './demos/demoProps';
 
 /**
- * Fixed-frame FPS HUD for the playground. Plain DOM on purpose — no glass
- * layers that would pollute the very thing being measured — and all per-frame
- * bookkeeping stays in refs: the text/canvas update at 4 Hz via direct DOM
- * mutation, never React re-renders.
+ * Fixed-frame FPS HUD for the playground. It rides on a GlassCard so the
+ * overlay follows the active theme, which makes the HUD itself a glass surface
+ * participating in per-frame backdrop rendering — it will slightly lower the
+ * frame rate it reports. That is a deliberate, accepted trade-off. All
+ * per-frame bookkeeping stays in refs: the text/canvas update at 4 Hz via
+ * direct DOM mutation, never React re-renders.
  */
 
 const WINDOW_FRAMES = 180; // ~3 s of frame deltas at 60 Hz
@@ -14,13 +19,25 @@ const GRAPH_H = 34;
 
 type Level = 'good' | 'ok' | 'bad';
 
+const BAR_COLORS_DARK: Record<Level, string> = {
+  good: '#4ade80',
+  ok: '#facc15',
+  bad: '#f87171',
+};
+
+const BAR_COLORS_LIGHT: Record<Level, string> = {
+  good: '#16a34a',
+  ok: '#ca8a04',
+  bad: '#dc2626',
+};
+
 function levelFor(p95: number): Level {
   if (p95 <= 20) return 'good';
   if (p95 <= 34) return 'ok';
   return 'bad';
 }
 
-export function FpsMeter() {
+export function FpsMeter({ params }: { params: DemoParams }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fpsRef = useRef<HTMLSpanElement>(null);
   const msRef = useRef<HTMLSpanElement>(null);
@@ -43,13 +60,18 @@ export function FpsMeter() {
     let lastUpdate = 0;
 
     const drawGraph = () => {
+      // The surface sets data-ngs-light; mirror its palette so bars stay
+      // legible over a light backdrop too.
+      const light =
+        rootRef.current?.closest('.pg-fps')?.getAttribute('data-ngs-light') === 'true';
+      const palette = light ? BAR_COLORS_LIGHT : BAR_COLORS_DARK;
       ctx.clearRect(0, 0, GRAPH_W, GRAPH_H);
       const barW = GRAPH_W / WINDOW_FRAMES;
       const scale = (GRAPH_H * 0.85) / 33.4; // 33.4ms ≈ dropped-60fps budget
       for (let i = 0; i < count; i++) {
         const d = frames[i];
         const h = Math.max(1, Math.min(d * scale, GRAPH_H));
-        ctx.fillStyle = d <= 20 ? '#4ade80' : d <= 34 ? '#facc15' : '#f87171';
+        ctx.fillStyle = palette[levelFor(d)];
         ctx.fillRect((i * GRAPH_W) / WINDOW_FRAMES, GRAPH_H - h, Math.max(1, barW - 0.5), h);
       }
     };
@@ -96,15 +118,17 @@ export function FpsMeter() {
   }, []);
 
   return (
-    <div className="pg-fps" ref={rootRef} data-level="good" aria-hidden="true">
-      <span className="pg-fps-num" ref={fpsRef}>
-        --
-      </span>
-      <span className="pg-fps-unit">fps</span>
-      <span className="pg-fps-ms" ref={msRef}>
-        --
-      </span>
-      <canvas className="pg-fps-graph" ref={canvasRef} />
-    </div>
+    <GlassCard className="pg-fps" padding="8px 12px" cornerRadius={999} {...glassProps(params)}>
+      <div className="pg-fps-row" ref={rootRef} data-level="good" aria-hidden="true">
+        <span className="pg-fps-num" ref={fpsRef}>
+          --
+        </span>
+        <span className="pg-fps-unit">fps</span>
+        <span className="pg-fps-ms" ref={msRef}>
+          --
+        </span>
+        <canvas className="pg-fps-graph" ref={canvasRef} />
+      </div>
+    </GlassCard>
   );
 }

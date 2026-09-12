@@ -1,5 +1,11 @@
 import { useRef, useState } from 'react';
-import { DEFAULT_OPTICS, type GlassOptics } from 'nico-glass-kit';
+import {
+  DEFAULT_LENS_MAP_RASTER_SCALE,
+  DEFAULT_OPTICS,
+  MAX_LENS_MAP_RASTER_SCALE,
+  MIN_LENS_MAP_RASTER_SCALE,
+  type GlassOptics,
+} from 'nico-glass-kit';
 import { GlassCard, type GlassQuality, type OverLight } from 'nico-glass-kit';
 import type { DemoParams } from './App';
 import { BACKGROUNDS } from './demos/BackgroundScene';
@@ -324,6 +330,23 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => setOptics('tintStrength', v)}
           />
+        </Group>
+
+        <Group title="性能 Performance">
+          <Slider
+            label="贴图精度 Map scale"
+            min={MIN_LENS_MAP_RASTER_SCALE}
+            max={MAX_LENS_MAP_RASTER_SCALE}
+            step={0.05}
+            value={params.mapRasterScale}
+            format={(v) => `${Math.round(v * 100)}%`}
+            onChange={(v) => set('mapRasterScale', v)}
+          />
+          <p className="cp-hint">
+            折射位移贴图的清晰度：越低，浏览器每帧的准备成本越小、折射边缘越柔和。
+            默认 {Math.round(DEFAULT_LENS_MAP_RASTER_SCALE * 100)}%，上限{' '}
+            {Math.round(MAX_LENS_MAP_RASTER_SCALE * 100)}%，可继续调低做对比。
+          </p>
         </Group>
 
         <Group title="折射 Refraction">

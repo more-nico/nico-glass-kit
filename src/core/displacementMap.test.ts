@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  clampLensMapRasterScale,
   clearLensMapCache,
   computeLensPixels,
   generateLensMap,
   lensMapCacheKey,
   lensMapCacheStats,
+  lensMapRasterSize,
+  renderPixelsToDataUrl,
   setLensMapObserver,
+  DEFAULT_LENS_MAP_RASTER_SCALE,
+  MAX_LENS_MAP_RASTER_SCALE,
   MAX_DISPLACEMENT_PX,
+  MIN_LENS_MAP_RASTER_SCALE,
 } from './displacementMap';
 
 const BASE = { width: 200, height: 120, radius: 40, edge: 10, curvature: 0.49, strength: 1 };
@@ -80,6 +86,45 @@ describe('computeLensPixels', () => {
   });
 });
 
+describe('lensMapRasterSize', () => {
+  it('applies the default scale, rounded, with a 1 px floor', () => {
+    expect(lensMapRasterSize(400, 240)).toEqual({
+      width: Math.round(400 * DEFAULT_LENS_MAP_RASTER_SCALE),
+      height: Math.round(240 * DEFAULT_LENS_MAP_RASTER_SCALE),
+    });
+    expect(lensMapRasterSize(3, 5)).toEqual({ width: 1, height: 1 });
+    expect(lensMapRasterSize(1, 1)).toEqual({ width: 1, height: 1 });
+  });
+
+  it('honours an explicit scale and clamps it to the supported range', () => {
+    expect(lensMapRasterSize(400, 240, 0.25)).toEqual({ width: 100, height: 60 });
+    expect(lensMapRasterSize(400, 240, 1)).toEqual({
+      width: Math.round(400 * MAX_LENS_MAP_RASTER_SCALE),
+      height: Math.round(240 * MAX_LENS_MAP_RASTER_SCALE),
+    });
+    expect(lensMapRasterSize(400, 240, 0)).toEqual({
+      width: Math.round(400 * MIN_LENS_MAP_RASTER_SCALE),
+      height: Math.round(240 * MIN_LENS_MAP_RASTER_SCALE),
+    });
+  });
+});
+
+describe('clampLensMapRasterScale', () => {
+  it('defaults to 0.2 and clamps into [0.1, 0.5]', () => {
+    expect(clampLensMapRasterScale(0.8)).toBe(MAX_LENS_MAP_RASTER_SCALE);
+    expect(clampLensMapRasterScale(0.25)).toBe(0.25);
+    expect(clampLensMapRasterScale(0.01)).toBe(MIN_LENS_MAP_RASTER_SCALE);
+    expect(clampLensMapRasterScale(undefined)).toBe(DEFAULT_LENS_MAP_RASTER_SCALE);
+    expect(clampLensMapRasterScale(Number.NaN)).toBe(DEFAULT_LENS_MAP_RASTER_SCALE);
+  });
+});
+
+describe('renderPixelsToDataUrl', () => {
+  it('returns no data URL without a DOM canvas (SSR / node)', () => {
+    expect(renderPixelsToDataUrl(computeLensPixels(BASE), 200, 120)).toBe('');
+  });
+});
+
 describe('generateLensMap', () => {
   beforeEach(() => {
     clearLensMapCache();
@@ -129,6 +174,12 @@ describe('generateLensMap', () => {
     expect(a).not.toBe(b);
   });
 
+  it('keys include the map raster scale', () => {
+    const a = lensMapCacheKey({ ...BASE });
+    const b = lensMapCacheKey({ ...BASE, rasterScale: 0.25 });
+    expect(a).not.toBe(b);
+  });
+
   it('notifies the observer only on misses', () => {
     const seen: number[] = [];
     setLensMapObserver((result) => seen.push(result.pixelWidth));
@@ -143,5 +194,13 @@ describe('generateLensMap', () => {
     expect(result.pixelHeight).toBe(240);
     expect(result.width).toBe(200);
     expect(result.height).toBe(120);
+  });
+
+  it('keeps the pixel buffer full-size and records the raster scale', () => {
+    const result = generateLensMap({ ...BASE, dpr: 2, rasterScale: 0.25, skipDataUrl: true });
+    expect(result.pixelWidth).toBe(400);
+    expect(result.pixelHeight).toBe(240);
+    expect(result.rasterScale).toBe(0.25);
+    expect(result.dataUrl).toBe('');
   });
 });

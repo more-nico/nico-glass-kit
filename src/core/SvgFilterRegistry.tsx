@@ -382,7 +382,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   filterIdRef.current = filterId;
 
   const { enabled, shared, map, blur, saturation, brightness, animateBrightness, dispersion } = opts;
-  const { width, height, radius, edge, curvature, strength, dpr } = map;
+  const { width, height, radius, edge, curvature, strength, dpr, rasterScale } = map;
 
   useEffect(() => {
     if (!registry || !enabled || width < 2 || height < 2) {
@@ -391,12 +391,12 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     }
     let id: string | null = null;
     try {
-      const generated = generateLensMap({ width, height, radius, edge, curvature, strength, dpr });
+      const generated = generateLensMap({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
       if (!generated.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
       const baseScale = generated.maxScale;
       baseScaleRef.current = baseScale;
       const key = [
-        lensMapCacheKey({ width, height, radius, edge, curvature, strength, dpr }),
+        lensMapCacheKey({ width, height, radius, edge, curvature, strength, dpr, rasterScale }),
         `b${blur}`,
         `sat${saturation}`,
         `br${brightness}`,
@@ -436,6 +436,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     curvature,
     strength,
     dpr,
+    rasterScale,
     blur,
     saturation,
     brightness,

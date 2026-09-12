@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  DEFAULT_LENS_MAP_RASTER_SCALE,
   DEFAULT_OPTICS,
   GlassPill,
   GlassProvider,
@@ -25,6 +26,7 @@ export interface DemoParams {
   highlight: number;
   elasticity: number;
   cornerRadius: number;
+  mapRasterScale: number;
   background: BackgroundId | 'custom';
 }
 
@@ -35,6 +37,7 @@ const DEFAULT_PARAMS: DemoParams = {
   highlight: 1,
   elasticity: 0.2,
   cornerRadius: 32,
+  mapRasterScale: DEFAULT_LENS_MAP_RASTER_SCALE,
   background: 'aurora',
 };
 
@@ -44,7 +47,11 @@ export default function App() {
   const [pillVisible, setPillVisible] = useState(false);
 
   return (
-    <GlassProvider quality={params.quality} overLight={params.overLight}>
+    <GlassProvider
+      quality={params.quality}
+      overLight={params.overLight}
+      lensMapRasterScale={params.mapRasterScale}
+    >
       <BackgroundScene id={params.background} customUrl={customBg} />
 
       <header className="pg-header">
@@ -71,7 +78,7 @@ export default function App() {
 
       <ControlPanel params={params} onChange={setParams} onUploadBg={setCustomBg} customBg={customBg} />
 
-      <FpsMeter />
+      <FpsMeter params={params} />
 
       <GlassPill
         visible={pillVisible}
