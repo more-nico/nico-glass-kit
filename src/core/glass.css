@@ -59,6 +59,8 @@
  *  - specular: driven by --ngx/--ngy/--ngs-spec-o (set from JS on pointer
  *    move) — a soft inner sheen plus an edge-ring glint that follows the
  *    pointer; --ngs-spec-o is 0 without a pointer, so the rim stays uniform.
+ *    While the glint is active (spec-o → 1) the static border dims to ~30%
+ *    brightness so the directional glint takes over; it recovers on leave.
  *  - --ngs-hl (highlightIntensity) scales every highlight channel.
  */
 .ngs-highlight {
@@ -95,7 +97,7 @@
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   mask-composite: exclude;
-  opacity: calc(0.8 * var(--ngs-hl, 1));
+  opacity: calc(0.8 * var(--ngs-hl, 1) * (1 - 0.7 * var(--ngs-spec-o, 0)));
 }
 
 /* Pointer-following specular glint, masked to a 2px edge ring. */

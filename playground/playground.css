@@ -413,10 +413,10 @@ code {
 
 .phone-frame {
   position: relative;
-  width: 340px;
+  width: 420px;
   max-width: 100%;
-  height: 560px;
-  border-radius: 36px;
+  height: 720px;
+  border-radius: 44px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
@@ -448,19 +448,56 @@ code {
   background: radial-gradient(circle at 60% 40%, #f97316, transparent 65%);
 }
 
-.phone-content {
+.phone-iframe {
   position: absolute;
   inset: 0;
-  padding: 84px 20px 120px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
 }
 
-.phone-row {
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
+/* 三件式悬浮顶栏：容器不拦截指针，玻璃件各自恢复交互 */
+.feed-topbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.feed-topbar > * {
+  pointer-events: auto;
+}
+
+/*
+ * 中间时间胶囊：玻璃层只盖容器 content box（.ngs-motion 100% 不含 padding），
+ * 所以 padding 必须放内层 .ngs-content，材质保持套件默认。
+ */
+.feed-clock .ngs-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 28px;
+}
+
+.feed-clock-primary {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.feed-clock-secondary {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--ngs-text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- control panel ---------- */

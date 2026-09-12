@@ -27,7 +27,7 @@ graph and RGB-split chromatic dispersion.
   `highlightIntensity`, `elasticity`, `quality`, `overLight`.
 
   The nine adjustable knobs and their defaults (Blur 4px, Saturation 100%,
-  Brightness 1.8, Tint `light-dark(rgb(255 255 255), rgb(18 20 26))`,
+  Brightness 1.1, Tint `light-dark(rgb(255 255 255), rgb(18 20 26))`,
   Tint strength 0.2, Refraction 1, Depth 10px, Curvature 0.49,
   Dispersion 0.1) come from `DEFAULT_OPTICS` in `src/core/optics.ts`.
 

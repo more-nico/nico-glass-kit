@@ -32,7 +32,7 @@ export const DEFAULT_OPTICS: GlassOptics = {
   // A clear pane: almost no blur, so the refraction band is what reads as glass.
   blur: 4,
   saturation: 100,
-  brightness: 1.8,
+  brightness: 1.1,
   tint: 'light-dark(rgb(255 255 255), rgb(18 20 26))',
   tintStrength: 0.2,
   refraction: 1,
