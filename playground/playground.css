@@ -457,6 +457,384 @@ code {
   background: #fff;
 }
 
+/* 自写 DOM 信息流页：与 iframe 同级同尺寸 */
+.phone-page {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- mini weibo feed ---------- */
+
+.mini-weibo {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding-bottom: 96px;
+  background: #f2f3f7;
+  color: #1f2329;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  scrollbar-width: none;
+}
+
+.mini-weibo::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.mw-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 76px 16px 10px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mw-logo {
+  flex: none;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: #e6162d;
+}
+
+.mw-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #f2f3f7;
+  color: #8a8f99;
+  font-size: 13px;
+}
+
+.mw-search svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.mw-search span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mw-post {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border-bottom: 8px solid #f2f3f7;
+}
+
+.mw-avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.mw-avatar--night {
+  background: linear-gradient(135deg, #6d5efc, #2b3a8f);
+}
+
+.mw-avatar--dawn {
+  background: linear-gradient(135deg, #ff9f43, #e63946);
+}
+
+.mw-avatar--text {
+  background: linear-gradient(135deg, #06d6a0, #118ab2);
+}
+
+.mw-avatar--sunset {
+  background: linear-gradient(135deg, #f72585, #7209b7);
+}
+
+.mw-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mw-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mw-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.mw-v {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #ff8200;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mw-time {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  color: #9398a2;
+  white-space: nowrap;
+}
+
+.mw-text {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.mw-topic {
+  color: #2f6fd0;
+}
+
+.mw-pic {
+  position: relative;
+  margin-top: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mw-pic-caption {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* 城市夜景（深） */
+.mw-pic--night {
+  height: 640px;
+  background: linear-gradient(180deg, #0b1026 0%, #121a3a 52%, #2b1e4a 100%);
+}
+
+.mw-stars,
+.mw-moon,
+.mw-city,
+.mw-sun {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mw-stars {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.9) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 34% 8%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 58% 22%, rgba(255, 255, 255, 0.85) 0 1.1px, transparent 2px),
+    radial-gradient(circle at 26% 40%, rgba(255, 255, 255, 0.6) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 8% 55%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 47% 61%, rgba(255, 255, 255, 0.55) 0 1px, transparent 1.6px);
+}
+
+.mw-moon {
+  top: 8%;
+  right: 14%;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 38% 36%,
+    #fffdf4 0 28%,
+    #f4e9c8 55%,
+    rgba(244, 233, 200, 0.15) 72%,
+    transparent 74%
+  );
+  box-shadow: 0 0 46px 14px rgba(255, 246, 214, 0.22);
+}
+
+.mw-city {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 150px;
+  background:
+    radial-gradient(circle, rgba(255, 214, 130, 0.85) 0 1.4px, transparent 2px) 0 0 / 26px 20px,
+    linear-gradient(180deg, rgba(4, 6, 14, 0) 0%, #04060e 58%);
+}
+
+/* 黎明（浅，嵌在深色帖中） */
+.mw-pic--dawn {
+  height: 420px;
+  background: linear-gradient(180deg, #4a5fa8 0%, #9b8fd8 30%, #ffbf8f 65%, #ffe9c0 100%);
+}
+
+.mw-pic--dawn .mw-pic-caption {
+  color: rgba(46, 34, 74, 0.62);
+}
+
+.mw-sun {
+  left: 22%;
+  bottom: 16%;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff8e2 0 32%,
+    rgba(255, 226, 168, 0.85) 55%,
+    rgba(255, 200, 130, 0.25) 75%,
+    transparent 78%
+  );
+  box-shadow: 0 0 42px 16px rgba(255, 220, 160, 0.5);
+}
+
+/* 晚霞（中间调） */
+.mw-pic--sunset {
+  height: 360px;
+  background: linear-gradient(180deg, #2b1055 0%, #6a5acd 38%, #ff7e5f 72%, #ffd08a 100%);
+}
+
+.mw-sun--low {
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+}
+
+.mw-actions {
+  display: flex;
+  gap: 24px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+  color: #8a8f99;
+}
+
+.mw-hot {
+  background: #fff;
+  padding: 14px 16px;
+  border-bottom: 8px solid #f2f3f7;
+}
+
+.mw-hot-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.mw-hot-flame {
+  font-size: 14px;
+}
+
+.mw-hot-more {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8a8f99;
+}
+
+.mw-hot-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.mw-hot-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  font-size: 14px;
+}
+
+.mw-hot-word {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #1f2329;
+}
+
+.mw-hot-heat {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  color: #b0b5bf;
+}
+
+.mw-rank {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: #f2f3f7;
+  color: #8a8f99;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mw-rank--1 {
+  background: #ff4d2e;
+  color: #fff;
+}
+
+.mw-rank--2 {
+  background: #ff7a1a;
+  color: #fff;
+}
+
+.mw-rank--3 {
+  background: #ffb020;
+  color: #fff;
+}
+
+.mw-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 26px 16px 34px;
+  font-size: 12px;
+  color: #a3a8b2;
+}
+
+.mw-end::before,
+.mw-end::after {
+  content: '';
+  width: 54px;
+  height: 1px;
+  background: #dde0e7;
+}
+
 /* 三件式悬浮顶栏：容器不拦截指针，玻璃件各自恢复交互 */
 .feed-topbar {
   position: absolute;
@@ -519,6 +897,12 @@ code {
   min-width: 85px;
   height: 64px;
   padding: 0 19px;
+  /* 槽位底衬的激活胶囊不做 background-color 过渡：过渡中的中间色会被逐元素
+     探测采样（首次重算仍返回旧 token 的 0.66 浅色），使压在其上的信息源按钮
+     在底栏翻暗后锁死为浅色。颜色即时切换后探测与绘制始终一致。 */
+  transition:
+    color var(--ngs-transition-fast),
+    transform var(--ngs-transition-fast);
 }
 
 .phone-frame .ngs-tab-label {

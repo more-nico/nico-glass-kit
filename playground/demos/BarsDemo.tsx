@@ -2,40 +2,45 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { GlassButton, GlassSurface, GlassTabBar } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
+import { WeiboFeed } from './WeiboFeed';
 import {
   ChevronLeftIcon,
   EllipsisIcon,
-  HackerNewsIcon,
   NprIcon,
   SolidotIcon,
+  WeiboIcon,
   WikipediaIcon,
 } from './icons';
 
 interface FeedSource {
   key: string;
   label: string;
-  url: string;
   icon: ReactNode;
+  kind: 'dom' | 'web';
+  url?: string;
 }
 
-/** 公网可嵌入信息流源（响应头已实测）。
+/** 首个源为自写 DOM 信息流（不透明内容可被逐元素探测，明暗随帖子内容实时翻转）；
+ *  其余为公网可嵌入信息流源（响应头已实测）。
  *  被拦截禁用：news.ycombinator.com (XFO DENY) · lite.cnn.com / arxiv.org (frame-ancestors 'none')。
  *  备选池：https://en.m.wikipedia.org/wiki/Wikipedia:Featured_articles */
 const FEEDS: FeedSource[] = [
-  { key: 'hn', label: 'HN', url: 'https://hn.algolia.com/', icon: <HackerNewsIcon /> },
+  { key: 'weibo', label: '微博', kind: 'dom', icon: <WeiboIcon /> },
   {
     key: 'wiki',
     label: '维基',
+    kind: 'web',
     url: 'https://en.wikipedia.org/wiki/Portal:Current_events',
     icon: <WikipediaIcon />,
   },
   {
     key: 'solidot',
     label: 'Solidot',
+    kind: 'web',
     url: 'https://www.solidot.org/',
     icon: <SolidotIcon />,
   },
-  { key: 'npr', label: 'NPR', url: 'https://text.npr.org/', icon: <NprIcon /> },
+  { key: 'npr', label: 'NPR', kind: 'web', url: 'https://text.npr.org/', icon: <NprIcon /> },
 ];
 
 function formatClock(date: Date) {
@@ -65,7 +70,7 @@ export function BarsDemo({ params }: { params: DemoParams }) {
         <span className="demo-index">03</span>
         <div className="demo-head-text">
           <h3>悬浮顶栏 · 实时信息流</h3>
-          <p>iOS 26 三件式悬浮玻璃顶栏，内嵌公网页面真实滚动</p>
+          <p>iOS 26 三件式悬浮玻璃顶栏，内嵌 DOM 信息流与公网页面真实滚动</p>
         </div>
       </header>
       <div className="demo-body">
@@ -78,15 +83,25 @@ export function BarsDemo({ params }: { params: DemoParams }) {
             </div>
             {FEEDS.map((feed) =>
               loaded.has(feed.key) ? (
-                <iframe
-                  key={feed.key}
-                  className="phone-iframe"
-                  src={feed.url}
-                  title={feed.label}
-                  style={{ display: feed.key === active ? 'block' : 'none' }}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                  referrerPolicy="no-referrer"
-                />
+                feed.kind === 'dom' ? (
+                  <div
+                    key={feed.key}
+                    className="phone-page"
+                    style={{ display: feed.key === active ? 'block' : 'none' }}
+                  >
+                    <WeiboFeed />
+                  </div>
+                ) : (
+                  <iframe
+                    key={feed.key}
+                    className="phone-iframe"
+                    src={feed.url}
+                    title={feed.label}
+                    style={{ display: feed.key === active ? 'block' : 'none' }}
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    referrerPolicy="no-referrer"
+                  />
+                )
               ) : null,
             )}
             <div className="feed-topbar">

@@ -102,6 +102,16 @@ export const HackerNewsIcon = (p: SVGProps<SVGSVGElement>) =>
     </>,
   );
 
+export const WeiboIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <circle cx="11" cy="12" r="7.5" />
+      <path d="M14.5 4.6c2.6-.3 5.1 1 6.4 3.1" />
+      <path d="M14.8 8.4c1.5-.1 2.9.7 3.6 2" />
+    </>,
+  );
+
 export const WikipediaIcon = (p: SVGProps<SVGSVGElement>) =>
   base(
     p,
