@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- `GlassButton`'s hover tint is ~70 % lighter: `--ngs-tint-hover` drops from
+  `rgba(255, 255, 255, 0.18)` to `rgba(255, 255, 255, 0.05)` over dark
+  backdrops. Over light backdrops it now darkens instead of washing out —
+  `rgba(255, 255, 255, 0.58)` becomes `rgba(0, 0, 0, 0.1)`. Hover feedback
+  still comes from the brightness boost and the specular rim light, which are
+  unchanged. `--ngs-tint-hover` has no other consumer.
+
 ### Performance
 
 - `overLight: 'auto'` backdrop probing now runs through one shared scheduler

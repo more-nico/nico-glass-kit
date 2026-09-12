@@ -29,7 +29,7 @@
     'Helvetica Neue', Arial, sans-serif;
 
   /* over-dark (default) tinting */
-  --ngs-tint-hover: rgba(255, 255, 255, 0.18);
+  --ngs-tint-hover: rgba(255, 255, 255, 0.05);
   --ngs-active-bg: rgba(255, 255, 255, 0.22);
   --ngs-text: rgba(255, 255, 255, 0.94);
   --ngs-text-dim: rgba(255, 255, 255, 0.62);
@@ -52,7 +52,7 @@
 /* over-light token set */
 .ngs-surface[data-ngs-light='true'] {
   --ngs-glass-tint: rgb(255 255 255);
-  --ngs-tint-hover: rgba(255, 255, 255, 0.58);
+  --ngs-tint-hover: rgba(0, 0, 0, 0.1);
   --ngs-active-bg: rgba(255, 255, 255, 0.66);
   --ngs-text: rgba(10, 12, 20, 0.88);
   --ngs-text-dim: rgba(10, 12, 20, 0.56);
