@@ -19,7 +19,11 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   as?: ElementType;
   /** Requested quality tier (degrades automatically). */
   quality?: GlassQuality;
-  /** Light/dark adaptation; `'auto'` follows prefers-color-scheme. */
+  /**
+   * Light/dark adaptation. `'auto'` samples the luminance of the backdrop
+   * painted beneath this element and picks Light/Dark per element (falls
+   * back to prefers-color-scheme when unreadable). `true`/`false` override.
+   */
   overLight?: OverLight;
   /** Corner radius px. Default 20. */
   cornerRadius?: number;
@@ -91,7 +95,8 @@ export function GlassSurface(props: GlassSurfaceProps) {
   } = props;
 
   const resolvedQuality = useGlassQuality(quality);
-  const light = useOverLight(overLight);
+  const containerRef = useRef<HTMLElement | null>(null);
+  const light = useOverLight(overLight, containerRef);
   const material = useMemo(() => resolveOptics(DEFAULT_OPTICS, optics), [optics]);
 
   // Hover brightness boost (interactive components only): swaps the filter
@@ -103,7 +108,6 @@ export function GlassSurface(props: GlassSurfaceProps) {
     ? material.brightness + hoverBrightnessBoost
     : material.brightness;
 
-  const containerRef = useRef<HTMLElement | null>(null);
   const motionRef = useRef<HTMLDivElement | null>(null);
   const highlightRef = useRef<HTMLDivElement | null>(null);
 

@@ -16,7 +16,11 @@ export const GlassConfigContext = createContext<GlassConfig>({
 export interface GlassProviderProps {
   /** Library-wide default quality tier. Default `'medium'`. */
   quality?: GlassQuality;
-  /** Library-wide default light/dark adaptation. Default `'auto'`. */
+  /**
+   * Library-wide default light/dark adaptation. `'auto'` resolves
+   * per-element from the backdrop painted beneath each surface.
+   * Default `'auto'`.
+   */
   overLight?: OverLight;
   children?: ReactNode;
 }

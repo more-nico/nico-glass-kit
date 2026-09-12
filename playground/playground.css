@@ -529,8 +529,7 @@ code {
 /* 底部信息源按钮：独立玻璃层逐片叠在 GlassTabBar 之上（z 101 > bar 的 100）。
    按钮 85×64 与槽位完全同尺寸（中心 y=53，bottom 21），激活高亮胶囊正好藏在
    按钮玻璃正后方，不会露出叠层边缘；bar 与按钮同为 7px 内缩网格。
-   color 必须显式取 --ngs-text：.ngs-btn 的 color:inherit 会绕过玻璃件的
-   明暗自适应，导致浅色材质上白字不可见。
+   文字/图标颜色跟随玻璃件的 --ngs-text 明暗自适应（.ngs-btn 已不再 color:inherit）。
    left 由内联 calc 给出（槽位 i = 50% − 177.5px + i×90px） */
 .feed-tab-btn {
   position: absolute;
@@ -538,7 +537,6 @@ code {
   width: 85px;
   height: 64px;
   z-index: 101;
-  color: var(--ngs-text);
 }
 
 /* 图标在上、文字在下（覆盖 sm 胶囊的横排默认样式）。

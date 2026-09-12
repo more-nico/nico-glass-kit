@@ -33,6 +33,7 @@
   --ngs-active-bg: rgba(255, 255, 255, 0.22);
   --ngs-text: rgba(255, 255, 255, 0.94);
   --ngs-text-dim: rgba(255, 255, 255, 0.62);
+  --ngs-focus-ring: rgba(255, 255, 255, 0.7);
 
   /* rim light (over dark) */
   --ngs-rim-top: rgba(255, 255, 255, 0.5);
@@ -55,6 +56,7 @@
   --ngs-active-bg: rgba(255, 255, 255, 0.66);
   --ngs-text: rgba(10, 12, 20, 0.88);
   --ngs-text-dim: rgba(10, 12, 20, 0.56);
+  --ngs-focus-ring: rgba(10, 12, 20, 0.5);
 
   --ngs-rim-top: rgba(255, 255, 255, 0.9);
   --ngs-rim-top-soft: rgba(255, 255, 255, 0.4);

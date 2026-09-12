@@ -4,7 +4,6 @@
   padding: 0;
   background: transparent;
   font: inherit;
-  color: inherit;
   cursor: pointer;
   user-select: none;
   transition: transform var(--ngs-transition-fast);
@@ -30,7 +29,7 @@
 }
 
 .ngs-btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline: 2px solid var(--ngs-focus-ring);
   outline-offset: 2px;
 }
 
