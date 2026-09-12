@@ -4,16 +4,7 @@ import './GlassCard.css';
 
 type GlassExtras = Pick<
   GlassSurfaceProps,
-  | 'quality'
-  | 'overLight'
-  | 'blur'
-  | 'saturation'
-  | 'displacementScale'
-  | 'aberrationIntensity'
-  | 'elasticity'
-  | 'highlightIntensity'
-  | 'profile'
-  | 'bezelWidth'
+  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
 >;
 
 export interface GlassCardProps extends HTMLAttributes<HTMLDivElement>, GlassExtras {
@@ -33,14 +24,9 @@ export function GlassCard(props: GlassCardProps) {
     children,
     quality,
     overLight,
-    blur,
-    saturation,
-    displacementScale,
-    aberrationIntensity,
+    optics,
     elasticity,
     highlightIntensity,
-    profile,
-    bezelWidth,
     ...rest
   } = props;
 
@@ -51,14 +37,9 @@ export function GlassCard(props: GlassCardProps) {
       style={style}
       quality={quality}
       overLight={overLight}
-      blur={blur}
-      saturation={saturation}
-      displacementScale={displacementScale}
-      aberrationIntensity={aberrationIntensity}
+      optics={optics}
       elasticity={elasticity}
       highlightIntensity={highlightIntensity}
-      profile={profile}
-      bezelWidth={bezelWidth}
       {...rest}
     >
       {/*

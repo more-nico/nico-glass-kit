@@ -4,16 +4,7 @@ import './GlassButton.css';
 
 type GlassExtras = Pick<
   GlassSurfaceProps,
-  | 'quality'
-  | 'overLight'
-  | 'blur'
-  | 'saturation'
-  | 'displacementScale'
-  | 'aberrationIntensity'
-  | 'elasticity'
-  | 'highlightIntensity'
-  | 'profile'
-  | 'bezelWidth'
+  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
 >;
 
 export interface GlassButtonProps
@@ -37,14 +28,9 @@ export function GlassButton(props: GlassButtonProps) {
     // glass extras
     quality,
     overLight,
-    blur,
-    saturation,
-    displacementScale,
-    aberrationIntensity,
+    optics,
     elasticity,
     highlightIntensity,
-    profile,
-    bezelWidth,
     ...rest
   } = props;
 
@@ -65,14 +51,9 @@ export function GlassButton(props: GlassButtonProps) {
       className={cls}
       quality={quality}
       overLight={overLight}
-      blur={blur}
-      saturation={saturation}
-      displacementScale={displacementScale}
-      aberrationIntensity={aberrationIntensity}
+      optics={optics}
       elasticity={elasticity}
       highlightIntensity={highlightIntensity}
-      profile={profile}
-      bezelWidth={bezelWidth}
       {...rest}
     >
       <span className="ngs-btn-content">

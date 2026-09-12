@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import {
+  DEFAULT_OPTICS,
   GlassPill,
   GlassProvider,
+  type GlassOptics,
   type GlassQuality,
   type OverLight,
 } from 'nico-glass-kit';
@@ -18,12 +20,9 @@ import './playground.css';
 export interface DemoParams {
   quality: GlassQuality;
   overLight: OverLight;
-  displacementScale: number;
-  blur: number;
-  saturation: number;
-  aberration: number;
-  elasticity: number;
+  optics: GlassOptics;
   highlight: number;
+  elasticity: number;
   cornerRadius: number;
   background: BackgroundId | 'custom';
 }
@@ -31,12 +30,9 @@ export interface DemoParams {
 const DEFAULT_PARAMS: DemoParams = {
   quality: 'high',
   overLight: 'auto',
-  displacementScale: 70,
-  blur: 12,
-  saturation: 140,
-  aberration: 2,
-  elasticity: 0.15,
+  optics: { ...DEFAULT_OPTICS },
   highlight: 1,
+  elasticity: 0.15,
   cornerRadius: 32,
   background: 'aurora',
 };
@@ -81,10 +77,7 @@ export default function App() {
         icon={<BellIcon />}
         primary="昨天 23:07"
         secondary="3 条新消息"
-        displacementScale={params.displacementScale}
-        blur={params.blur}
-        saturation={params.saturation}
-        aberrationIntensity={params.aberration}
+        optics={params.optics}
         highlightIntensity={params.highlight}
         elasticity={0}
       />

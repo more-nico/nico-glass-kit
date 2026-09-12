@@ -37,7 +37,11 @@
 /* Backdrop layer: tint is CSS in every tier so degradation stays consistent. */
 .ngs-effect {
   z-index: 0;
-  background: var(--ngs-tint);
+  background: color-mix(
+    in oklab,
+    var(--ngs-glass-tint) calc(var(--ngs-glass-tint-strength) * 100%),
+    transparent
+  );
   transition: opacity var(--ngs-transition);
 }
 

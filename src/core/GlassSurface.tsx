@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -10,7 +11,7 @@ import {
 import { useGlassQuality, type GlassQuality } from './useGlassQuality';
 import { useOverLight, type OverLight } from './useOverLight';
 import { useGlassFilter } from './SvgFilterRegistry';
-import type { SurfaceProfileFn, SurfaceProfileName } from './surfaceFunctions';
+import { DEFAULT_OPTICS, resolveOptics, type GlassOptics } from './optics';
 
 export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   /** Rendered element, default `'div'`. */
@@ -21,18 +22,12 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   overLight?: OverLight;
   /** Corner radius px. Default 20. */
   cornerRadius?: number;
-  /** Curved-edge width px (default derived from radius/size). */
-  bezelWidth?: number;
-  /** Surface profile for refraction, default `'squircle'`. */
-  profile?: SurfaceProfileName | SurfaceProfileFn;
-  /** Backdrop blur px (Low tier; filter tiers use blur/3 Gaussian). Default 12. */
-  blur?: number;
-  /** Backdrop saturation percent. Default 140. */
-  saturation?: number;
-  /** Displacement strength; 70 = physically accurate. Default 70. */
-  displacementScale?: number;
-  /** Chromatic aberration px (High tier). Default 2. */
-  aberrationIntensity?: number;
+  /**
+   * Glass material optics: Blur, Saturation, Brightness, Tint, Tint strength,
+   * Refraction, Depth, Curvature, Dispersion. Sparse overrides are merged
+   * over {@link DEFAULT_OPTICS}.
+   */
+  optics?: Partial<GlassOptics>;
   /** Mouse elasticity 0..1 (High tier; 0 = rigid). Default 0.15. */
   elasticity?: number;
   /**
@@ -70,12 +65,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     quality,
     overLight,
     cornerRadius = 20,
-    bezelWidth,
-    profile,
-    blur = 12,
-    saturation = 140,
-    displacementScale = 70,
-    aberrationIntensity = 2,
+    optics,
     elasticity = 0.15,
     highlightIntensity = 1,
     className,
@@ -86,6 +76,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
 
   const resolvedQuality = useGlassQuality(quality);
   const light = useOverLight(overLight);
+  const material = useMemo(() => resolveOptics(DEFAULT_OPTICS, optics), [optics]);
 
   const containerRef = useRef<HTMLElement | null>(null);
   const motionRef = useRef<HTMLDivElement | null>(null);
@@ -118,24 +109,33 @@ export function GlassSurface(props: GlassSurfaceProps) {
     };
   }, []);
 
+  const dpr = useMemo(
+    () => (typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2)),
+    [],
+  );
+
   const needsFilter =
     resolvedQuality !== 'low' && size.width >= 2 && size.height >= 2;
   const { filterId, baseScaleRef, setFilterScale } = useGlassFilter({
     enabled: needsFilter,
     shared: resolvedQuality === 'medium',
-    width: size.width,
-    height: size.height,
-    radius: cornerRadius,
-    bezel: bezelWidth,
-    profile,
-    displacementScale,
-    blur,
-    saturation,
-    aberration: resolvedQuality === 'high' ? aberrationIntensity : 0,
+    map: {
+      width: size.width,
+      height: size.height,
+      radius: cornerRadius,
+      edge: Math.max(material.depth, 0.5),
+      curvature: material.curvature,
+      strength: material.refraction,
+      dpr,
+    },
+    blur: material.blur,
+    saturation: material.saturation,
+    brightness: material.brightness,
+    dispersion: material.dispersion,
   });
 
   // High-tier mouse elasticity: animates ONLY the feDisplacementMap `scale`
-  // attribute and the motion wrapper's transform — never rebuilds the map.
+  // attributes and the motion wrapper's transform — never rebuilds the map.
   const springRef = useRef<SpringState | null>(null);
   useEffect(() => {
     const el = containerRef.current;
@@ -275,7 +275,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     };
   }, [highlightIntensity]);
 
-  const lowBackdrop = `blur(${blur}px) saturate(${saturation}%)`;
+  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${material.brightness})`;
   const effectStyle: CSSProperties =
     resolvedQuality !== 'low' && filterId
       ? { backdropFilter: `url(#${filterId})` }

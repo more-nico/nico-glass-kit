@@ -664,9 +664,47 @@ code {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
+.cp-tint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-color {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px;
+  cursor: pointer;
+}
+
+.cp-mini {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--ngs-text);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.cp-mini:hover:enabled {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.cp-mini:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .cp-presets {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cp-preset-btn {

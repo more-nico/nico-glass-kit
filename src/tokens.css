@@ -4,9 +4,16 @@
  * backgrounds carry `[data-ngs-light="true"]` which swaps the token set.
  */
 :root {
-  /* blur / saturation */
-  --ngs-blur: 12px;
-  --ngs-saturation: 140%;
+  /* material optics (mirrors DEFAULT_OPTICS in src/core/optics.ts) */
+  --ngs-glass-blur: 4px;
+  --ngs-glass-saturation: 100%;
+  --ngs-glass-brightness: 1.8;
+  --ngs-glass-tint: rgb(18 20 26);
+  --ngs-glass-tint-strength: 0.2;
+  --ngs-lens-refraction: 1;
+  --ngs-lens-depth: 10px;
+  --ngs-lens-curvature: 0.49;
+  --ngs-lens-dispersion: 0.1;
 
   /* radii */
   --ngs-radius-sm: 12px;
@@ -24,8 +31,6 @@
     'Helvetica Neue', Arial, sans-serif;
 
   /* over-dark (default) tinting */
-  --ngs-tint: rgba(18, 20, 28, 0.18);
-  --ngs-tint-strong: rgba(255, 255, 255, 0.14);
   --ngs-tint-hover: rgba(255, 255, 255, 0.18);
   --ngs-active-bg: rgba(255, 255, 255, 0.22);
   --ngs-text: rgba(255, 255, 255, 0.94);
@@ -47,8 +52,7 @@
 
 /* over-light token set */
 .ngs-surface[data-ngs-light='true'] {
-  --ngs-tint: rgba(255, 255, 255, 0.32);
-  --ngs-tint-strong: rgba(255, 255, 255, 0.5);
+  --ngs-glass-tint: rgb(255 255 255);
   --ngs-tint-hover: rgba(255, 255, 255, 0.58);
   --ngs-active-bg: rgba(255, 255, 255, 0.66);
   --ngs-text: rgba(10, 12, 20, 0.88);

@@ -22,10 +22,9 @@ export function CardDemo({ params }: { params: DemoParams }) {
           >
             <h4 className="demo-card-title">液态玻璃卡片</h4>
             <p className="demo-card-text">
-              边缘折射由 Squircle 表面函数与 Snell
-              定律实时计算，位移贴图按几何缓存复用；鼠标靠近时只有
-              <code>feDisplacementMap</code> 的 <code>scale</code> 参与弹性动画，
-              贴图本身不会重建。
+              边缘折射由圆角矩形 SDF 与 curvature/depth 参数实时生成位移贴图并按
+              几何缓存复用；鼠标靠近时只有 <code>feDisplacementMap</code> 的{' '}
+              <code>scale</code> 参与弹性动画，贴图本身不会重建。
             </p>
             <div className="demo-card-actions">
               <GlassButton size="sm" {...glassProps(params)}>

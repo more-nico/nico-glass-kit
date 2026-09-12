@@ -4,16 +4,7 @@ import './GlassTabBar.css';
 
 type GlassExtras = Pick<
   GlassSurfaceProps,
-  | 'quality'
-  | 'overLight'
-  | 'blur'
-  | 'saturation'
-  | 'displacementScale'
-  | 'aberrationIntensity'
-  | 'elasticity'
-  | 'highlightIntensity'
-  | 'profile'
-  | 'bezelWidth'
+  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
 >;
 
 export interface GlassTabBarItem {
@@ -42,14 +33,9 @@ export function GlassTabBar(props: GlassTabBarProps) {
     className,
     quality,
     overLight,
-    blur,
-    saturation,
-    displacementScale,
-    aberrationIntensity,
+    optics,
     elasticity,
     highlightIntensity,
-    profile,
-    bezelWidth,
     ...rest
   } = props;
 
@@ -60,14 +46,9 @@ export function GlassTabBar(props: GlassTabBarProps) {
       className={['ngs-tabbar', className].filter(Boolean).join(' ')}
       quality={quality}
       overLight={overLight}
-      blur={blur}
-      saturation={saturation}
-      displacementScale={displacementScale}
-      aberrationIntensity={aberrationIntensity}
+      optics={optics}
       elasticity={elasticity}
       highlightIntensity={highlightIntensity}
-      profile={profile}
-      bezelWidth={bezelWidth}
       {...rest}
     >
       <div className="ngs-tabbar-inner" role="tablist">

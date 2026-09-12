@@ -4,9 +4,14 @@
  * identical geometry/params share one node (Medium tier), while High tier
  * instances get private entries they can animate freely.
  *
- * `setScale` mutates the `feDisplacementMap` `scale` attribute directly —
- * cheap per-frame animation without React re-renders and *without* ever
- * rebuilding the displacement map.
+ * The graph is assembled from `lensFilter.ts` pass descriptors (ported from
+ * the nicoGlassKit reference): feImage(map) → in-graph blur → saturate →
+ * brightness → displacement (single, or three RGB-separated passes for
+ * chromatic dispersion blended back with screen).
+ *
+ * `setScale` rescales every `feDisplacementMap` multiplicatively from the
+ * base scale — cheap per-frame animation without React re-renders and
+ * *without* ever rebuilding the displacement map.
  */
 
 import {
@@ -21,34 +26,42 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react';
+import { generateLensMap, lensMapCacheKey, type LensMapOptions } from './displacementMap';
 import {
-  displacementMapCacheKey,
-  getDisplacementMap,
-} from './displacementMap';
-import type { SurfaceProfileFn, SurfaceProfileName } from './surfaceFunctions';
+  createLensFilter,
+  lensChannelMatrix,
+  lensPassScaleRatios,
+  lensRegionPercent,
+  lensSaturationMatrix,
+  type LensFilterPass,
+} from './lensFilter';
 
 export interface GlassFilterSpec {
   key: string;
-  /** feImage placement (map overscan offset, ≤ 0). */
-  offsetX: number;
-  offsetY: number;
-  /** feImage bitmap size (element box + overscan). */
+  /** feImage bitmap size (element box, CSS px). */
   width: number;
   height: number;
   mapUrl: string;
   /** Base feDisplacementMap scale (px). */
   scale: number;
-  /** feGaussianBlur stdDeviation. */
+  /** Backdrop blur radius in px, sigma = blur/2 inside the graph. */
   blur: number;
   /** Percent (100 = unchanged). */
   saturation: number;
-  /** Chromatic aberration: +/- scale separation between R and B channels. */
-  aberration: number;
+  /** Brightness multiplier (1 = unchanged). */
+  brightness: number;
+  /** Chromatic dispersion 0–1. */
+  dispersion: number;
 }
 
 interface RegistryEntry {
   id: string;
-  spec: GlassFilterSpec;
+  mapUrl: string;
+  width: number;
+  height: number;
+  passes: LensFilterPass[];
+  ratios: number[];
+  region: { x: string; y: string; width: string; height: string };
   count: number;
 }
 
@@ -60,20 +73,11 @@ interface RegistryApi {
 
 export const GlassFilterRegistryContext = createContext<RegistryApi | null>(null);
 
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
-
-// Channel isolation matrices (keep alpha, zero the other two channels).
-const RED_ONLY = '1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0';
-const GREEN_ONLY = '0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0';
-const BLUE_ONLY = '0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0';
-
 export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [entries, setEntries] = useState<Map<string, RegistryEntry>>(new Map());
   const idToKey = useRef(new Map<string, string>());
-  const scaleNodes = useRef(
-    new Map<string, { node: SVGFEDisplacementMapElement; delta: number }>(),
-  );
+  const scaleNodes = useRef(new Map<string, { node: SVGFEDisplacementMapElement; ratio: number }>());
 
   const idFor = useCallback(
     (key: string) => {
@@ -91,8 +95,30 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
       setEntries((prev) => {
         const next = new Map(prev);
         const existing = next.get(spec.key);
-        if (existing) next.set(spec.key, { ...existing, count: existing.count + 1 });
-        else next.set(spec.key, { id, spec, count: 1 });
+        if (existing) {
+          next.set(spec.key, { ...existing, count: existing.count + 1 });
+        } else {
+          const descriptor = createLensFilter({
+            mapUrl: spec.mapUrl,
+            width: spec.width,
+            height: spec.height,
+            scale: spec.scale,
+            blur: spec.blur,
+            saturation: spec.saturation,
+            brightness: spec.brightness,
+            dispersion: spec.dispersion,
+          });
+          next.set(spec.key, {
+            id,
+            mapUrl: spec.mapUrl,
+            width: spec.width,
+            height: spec.height,
+            passes: descriptor.passes,
+            ratios: lensPassScaleRatios(descriptor.passes, spec.scale),
+            region: lensRegionPercent(spec.width, spec.height, descriptor.regionPaddingPx),
+            count: 1,
+          });
+        }
         return next;
       });
       return id;
@@ -118,9 +144,9 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   }, []);
 
   const setScale = useCallback((id: string, base: number) => {
-    scaleNodes.current.forEach(({ node, delta }, slotId) => {
+    scaleNodes.current.forEach(({ node, ratio }, slotId) => {
       if (slotId.startsWith(`${id}:`)) {
-        node.setAttribute('scale', String(Math.max(0, base + delta)));
+        node.setAttribute('scale', String(Math.max(0, base * ratio)));
       }
     });
   }, []);
@@ -128,12 +154,85 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   const api = useMemo<RegistryApi>(() => ({ acquire, release, setScale }), [acquire, release, setScale]);
 
   const scaleRef =
-    (id: string, slot: number, delta: number) =>
+    (id: string, slot: number, ratio: number) =>
     (node: SVGFEDisplacementMapElement | null) => {
       const slotId = `${id}:${slot}`;
-      if (node) scaleNodes.current.set(slotId, { node, delta });
+      if (node) scaleNodes.current.set(slotId, { node, ratio });
       else scaleNodes.current.delete(slotId);
     };
+
+  const renderPass = (
+    id: string,
+    ratios: number[],
+    pass: LensFilterPass,
+    index: number,
+    nextSlot: () => number,
+  ) => {
+    switch (pass.type) {
+      case 'displacement': {
+        const slot = nextSlot();
+        return (
+          <feDisplacementMap
+            key={index}
+            ref={scaleRef(id, slot, ratios[slot] ?? 1)}
+            in={pass.input}
+            in2={pass.map}
+            scale={pass.scale}
+            xChannelSelector="R"
+            yChannelSelector="G"
+            result={pass.result}
+          />
+        );
+      }
+      case 'channel':
+        return (
+          <feColorMatrix
+            key={index}
+            in={pass.input}
+            type="matrix"
+            values={lensChannelMatrix(pass.channel)}
+            result={pass.result}
+          />
+        );
+      case 'blend':
+        return (
+          <feBlend
+            key={index}
+            in={pass.input}
+            in2={pass.input2}
+            mode={pass.mode}
+            result={pass.result}
+          />
+        );
+      case 'blur':
+        return (
+          <feGaussianBlur
+            key={index}
+            in={pass.input}
+            stdDeviation={pass.sigma}
+            result={pass.result}
+          />
+        );
+      case 'saturate':
+        return (
+          <feColorMatrix
+            key={index}
+            in={pass.input}
+            type="matrix"
+            values={lensSaturationMatrix(pass.amount)}
+            result={pass.result}
+          />
+        );
+      case 'brightness':
+        return (
+          <feComponentTransfer key={index} in={pass.input} result={pass.result}>
+            <feFuncR type="linear" slope={pass.amount} intercept={0} />
+            <feFuncG type="linear" slope={pass.amount} intercept={0} />
+            <feFuncB type="linear" slope={pass.amount} intercept={0} />
+          </feComponentTransfer>
+        );
+    }
+  };
 
   return (
     <GlassFilterRegistryContext.Provider value={api}>
@@ -145,85 +244,37 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
         colorInterpolationFilters="sRGB"
       >
         <defs>
-          {[...entries.values()].map(({ id, spec }) => (
-            <filter
-              key={id}
-              id={id}
-              x="-5%"
-              y="-5%"
-              width="110%"
-              height="110%"
-              colorInterpolationFilters="sRGB"
-            >
-              <feImage
-                href={spec.mapUrl}
-                x={spec.offsetX}
-                y={spec.offsetY}
-                width={spec.width}
-                height={spec.height}
-                preserveAspectRatio="none"
-                result="mapRaw"
-              />
-              {/*
-               * Tile the map infinitely: any sample outside the map falls back
-               * to its (neutral) edge pixels instead of transparent black,
-               * which feDisplacementMap would read as MAX displacement.
-               */}
-              <feTile in="mapRaw" result="map" />
-              {spec.aberration > 0 ? (
-                <>
-                  <feDisplacementMap
-                    ref={scaleRef(id, 0, spec.aberration)}
-                    in="SourceGraphic"
-                    in2="map"
-                    scale={spec.scale + spec.aberration}
-                    xChannelSelector="R"
-                    yChannelSelector="G"
-                    result="dispR"
-                  />
-                  <feColorMatrix in="dispR" type="matrix" values={RED_ONLY} result="chR" />
-                  <feDisplacementMap
-                    ref={scaleRef(id, 1, 0)}
-                    in="SourceGraphic"
-                    in2="map"
-                    scale={spec.scale}
-                    xChannelSelector="R"
-                    yChannelSelector="G"
-                    result="dispG"
-                  />
-                  <feColorMatrix in="dispG" type="matrix" values={GREEN_ONLY} result="chG" />
-                  <feDisplacementMap
-                    ref={scaleRef(id, 2, -spec.aberration)}
-                    in="SourceGraphic"
-                    in2="map"
-                    scale={Math.max(0, spec.scale - spec.aberration)}
-                    xChannelSelector="R"
-                    yChannelSelector="G"
-                    result="dispB"
-                  />
-                  <feColorMatrix in="dispB" type="matrix" values={BLUE_ONLY} result="chB" />
-                  <feComposite in="chR" in2="chG" operator="arithmetic" k1={0} k2={1} k3={1} k4={0} result="rg" />
-                  <feComposite in="rg" in2="chB" operator="arithmetic" k1={0} k2={1} k3={1} k4={0} result="rgb" />
-                  <feGaussianBlur in="rgb" stdDeviation={spec.blur} result="blurred" />
-                  <feColorMatrix in="blurred" type="saturate" values={String(spec.saturation / 100)} />
-                </>
-              ) : (
-                <>
-                  <feDisplacementMap
-                    ref={scaleRef(id, 0, 0)}
-                    in="SourceGraphic"
-                    in2="map"
-                    scale={spec.scale}
-                    xChannelSelector="R"
-                    yChannelSelector="G"
-                    result="disp"
-                  />
-                  <feGaussianBlur in="disp" stdDeviation={spec.blur} result="blurred" />
-                  <feColorMatrix in="blurred" type="saturate" values={String(spec.saturation / 100)} />
-                </>
-              )}
-            </filter>
-          ))}
+          {[...entries.values()].map(({ id, mapUrl, width, height, passes, ratios, region }) => {
+            let slot = 0;
+            const nextSlot = (): number => slot++;
+            return (
+              <filter
+                key={id}
+                id={id}
+                x={region.x}
+                y={region.y}
+                width={region.width}
+                height={region.height}
+                colorInterpolationFilters="sRGB"
+              >
+                {/*
+                  * The displacement map. preserveAspectRatio=none stretches the
+                  * bitmap over the element box; neutral interior pixels keep the
+                  * flat middle undistorted.
+                  */}
+                <feImage
+                  href={mapUrl}
+                  x="0"
+                  y="0"
+                  width={width}
+                  height={height}
+                  preserveAspectRatio="none"
+                  result="map"
+                />
+                {passes.map((pass, index) => renderPass(id, ratios, pass, index, nextSlot))}
+              </filter>
+            );
+          })}
         </defs>
       </svg>
     </GlassFilterRegistryContext.Provider>
@@ -235,25 +286,22 @@ export interface UseGlassFilterOptions {
   enabled: boolean;
   /** true = share filter across identical geometry (Medium); false = private (High). */
   shared: boolean;
-  width: number;
-  height: number;
-  radius: number;
-  bezel?: number;
-  profile?: SurfaceProfileName | SurfaceProfileFn;
-  /** User knob; 70 = physically accurate displacement. */
-  displacementScale: number;
-  /** CSS-px backdrop blur (converted to a Gaussian stdDeviation). */
+  /** Lens geometry + material params (optics-resolved). */
+  map: Omit<LensMapOptions, 'skipDataUrl'>;
+  /** Backdrop blur radius in px applied inside the graph (sigma = blur/2). */
   blur: number;
   /** Percent. */
   saturation: number;
-  /** High tier only. */
-  aberration: number;
+  /** Brightness multiplier. */
+  brightness: number;
+  /** Chromatic dispersion 0–1. */
+  dispersion: number;
 }
 
 export interface UseGlassFilterResult {
   filterId: string | null;
   baseScaleRef: MutableRefObject<number>;
-  /** Direct DOM mutation of the feDisplacementMap scale, safe per frame. */
+  /** Direct DOM mutation of the feDisplacementMap scales, safe per frame. */
   setFilterScale: (base: number) => void;
 }
 
@@ -265,19 +313,8 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   const filterIdRef = useRef<string | null>(null);
   filterIdRef.current = filterId;
 
-  const {
-    enabled,
-    shared,
-    width,
-    height,
-    radius,
-    bezel,
-    profile,
-    displacementScale,
-    blur,
-    saturation,
-    aberration,
-  } = opts;
+  const { enabled, shared, map, blur, saturation, brightness, dispersion } = opts;
+  const { width, height, radius, edge, curvature, strength, dpr } = map;
 
   useEffect(() => {
     if (!registry || !enabled || width < 2 || height < 2) {
@@ -286,29 +323,29 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     }
     let id: string | null = null;
     try {
-      const map = getDisplacementMap({ width, height, radius, bezel, profile });
-      const baseScale = 2 * map.maxAbs * (displacementScale / 70);
+      const generated = generateLensMap({ width, height, radius, edge, curvature, strength, dpr });
+      if (!generated.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
+      const baseScale = generated.maxScale;
       baseScaleRef.current = baseScale;
-      const blurStd = clamp(blur / 3, 1, 6);
       const key = [
-        displacementMapCacheKey({ width, height, radius, bezel, profile }),
-        `b${blurStd}`,
-        `s${saturation}`,
-        `a${aberration}`,
+        lensMapCacheKey({ width, height, radius, edge, curvature, strength, dpr }),
+        `b${blur}`,
+        `sat${saturation}`,
+        `br${brightness}`,
+        `x${dispersion}`,
         `sc${Math.round(baseScale * 100)}`,
         shared ? 'shared' : instanceKey,
       ].join('|');
       id = registry.acquire({
         key,
-        offsetX: map.offsetX,
-        offsetY: map.offsetY,
-        width: map.width,
-        height: map.height,
-        mapUrl: map.url,
+        width,
+        height,
+        mapUrl: generated.dataUrl,
         scale: baseScale,
-        blur: blurStd,
+        blur,
         saturation,
-        aberration,
+        brightness,
+        dispersion,
       });
       setFilterId(id);
     } catch {
@@ -325,12 +362,14 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     width,
     height,
     radius,
-    bezel,
-    profile,
-    displacementScale,
+    edge,
+    curvature,
+    strength,
+    dpr,
     blur,
     saturation,
-    aberration,
+    brightness,
+    dispersion,
     instanceKey,
   ]);
 

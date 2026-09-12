@@ -12,16 +12,20 @@ export type { GlassQuality } from './core/useGlassQuality';
 export { useOverLight } from './core/useOverLight';
 export type { OverLight } from './core/useOverLight';
 
+export { DEFAULT_OPTICS, resolveOptics, opticsToCssVars } from './core/optics';
+export type { GlassOptics } from './core/optics';
+
+export {
+  generateLensMap,
+  clearLensMapCache,
+  lensMapCacheStats,
+} from './core/displacementMap';
+export type { LensMapOptions, LensMapResult } from './core/displacementMap';
+
 export {
   supportsBackdropFilter,
   supportsSvgBackdropFilter,
 } from './core/supports';
-
-export { surfaceProfiles, resolveSurfaceProfile } from './core/surfaceFunctions';
-export type {
-  SurfaceProfileFn,
-  SurfaceProfileName,
-} from './core/surfaceFunctions';
 
 export { GlassButton } from './components/GlassButton';
 export type { GlassButtonProps } from './components/GlassButton';
