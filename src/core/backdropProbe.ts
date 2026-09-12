@@ -503,6 +503,46 @@ const UNKNOWN_CONTENT_TAGS = new Set(['IFRAME', 'FRAME', 'OBJECT', 'EMBED', 'VID
  * the probe reports a null luminance and the caller falls back to
  * `prefers-color-scheme`.
  */
+
+/* ---------------------- per-node paint cache ------------------------ */
+
+/**
+ * Expensive per-node background analysis, cached: `cs.backgroundImage` can
+ * be a multi-megabyte data URL whose string materialisation plus layer
+ * parsing would otherwise repeat for every sample point of every probe.
+ * Entries are invalidated wholesale by {@link invalidateBackdropPaintInfo}
+ * whenever a mutation/resize may have changed what nodes paint;
+ * scroll-triggered probes reuse entries without touching the strings.
+ */
+interface NodePaintInfo {
+  image: FirstImage | null;
+  gradient: GradientSpec | null;
+  size: string;
+  position: string;
+}
+
+let paintInfoCache = new WeakMap<Element, NodePaintInfo>();
+
+/** Clears the per-node background analysis cache (backdrop may have changed). */
+export function invalidateBackdropPaintInfo(): void {
+  paintInfoCache = new WeakMap();
+}
+
+function paintInfoFor(node: Element, cs: CSSStyleDeclaration): NodePaintInfo {
+  let info = paintInfoCache.get(node);
+  if (!info) {
+    const image = firstImageLayer(cs.backgroundImage);
+    info = {
+      image,
+      gradient: image?.kind === 'gradient' ? parseGradient(image.layer) : null,
+      size: cs.backgroundSize,
+      position: cs.backgroundPosition,
+    };
+    paintInfoCache.set(node, info);
+  }
+  return info;
+}
+
 export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
   const doc = el.ownerDocument;
   const win = doc.defaultView;
@@ -522,37 +562,38 @@ export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
   let pendingImages = false;
   const luminances: number[] = [];
 
-  const makeLayer = (cs: CSSStyleDeclaration, nodeRect: DOMRect, point: Point): PaintLayer => {
-    let gradient: GradientSpec | null = null;
+  const makeLayer = (node: Element, cs: CSSStyleDeclaration, nodeRect: DOMRect, point: Point): PaintLayer => {
+    // The background-image analysis is served from the per-node paint cache:
+    // reading `cs.backgroundImage` materialises the whole value (data URLs
+    // can be megabytes) and firstImageLayer/extractUrl walk it, so doing
+    // that per sample point would dominate every probe.
+    const info = paintInfoFor(node, cs);
     let imageColor: Rgba | null = null;
-    const image = firstImageLayer(cs.backgroundImage);
-    if (image) {
-      if (image.kind === 'gradient') {
-        gradient = parseGradient(image.layer);
-      } else {
-        const state = requestImage(image.url);
-        if (state === 'pending') {
-          pendingImages = true;
-        } else if (state !== 'failed') {
-          // Precise pixel only for the cover+center case the playground and
-          // most full-bleed backgrounds use; otherwise the whole-image average.
-          const size = cs.backgroundSize;
-          const position = cs.backgroundPosition;
-          const precise =
-            size === 'cover' &&
-            (position === 'center' || position.includes('center') || position.includes('50%'));
-          imageColor = precise
-            ? sampleImagePixel(state.img, { width: nodeRect.width, height: nodeRect.height }, point) ??
-              state.average
-            : state.average;
-        }
+    if (info.image && info.image.kind === 'url') {
+      // The cached FirstImage holds the exact URL string object, so this
+      // lookup is an identity hit instead of re-hashing megabytes per point.
+      const state = requestImage(info.image.url);
+      if (state === 'pending') {
+        pendingImages = true;
+      } else if (state !== 'failed') {
+        // Precise pixel only for the cover+center case the playground and
+        // most full-bleed backgrounds use; otherwise the whole-image average.
+        const precise =
+          info.size === 'cover' &&
+          (info.position === 'center' ||
+            info.position.includes('center') ||
+            info.position.includes('50%'));
+        imageColor = precise
+          ? sampleImagePixel(state.img, { width: nodeRect.width, height: nodeRect.height }, point) ??
+            state.average
+          : state.average;
       }
     }
     return {
       box: { width: nodeRect.width, height: nodeRect.height },
       point,
       backgroundColor: parseCssColor(cs.backgroundColor),
-      gradient,
+      gradient: info.gradient,
       imageColor,
     };
   };
@@ -588,7 +629,7 @@ export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
           nodeRect = node.getBoundingClientRect();
           rects.set(node, nodeRect);
         }
-        layers.push(makeLayer(cs, nodeRect, { x: x - nodeRect.left, y: y - nodeRect.top }));
+        layers.push(makeLayer(node, cs, nodeRect, { x: x - nodeRect.left, y: y - nodeRect.top }));
         if (layers.length >= MAX_LAYERS_PER_POINT) break;
       }
       if (!pointKnown) continue;
@@ -618,11 +659,30 @@ function pageFallbackColor(doc: Document): Rgba {
   return { r: 255, g: 255, b: 255, a: 1 };
 }
 
-type FirstImage = { kind: 'gradient'; layer: string } | { kind: 'url'; url: string };
+export type FirstImage = { kind: 'gradient'; layer: string } | { kind: 'url'; url: string };
 
-function firstImageLayer(backgroundImage: string): FirstImage | null {
-  const s = backgroundImage.trim();
-  if (!s || s.toLowerCase() === 'none') return null;
+/**
+ * Extracts the first background-image layer as a gradient spec or a url().
+ * Fast path for a leading `url(...)`: data URLs can be megabytes, contain no
+ * top-level commas and no parens in their base64 payload, so slicing to the
+ * closing paren avoids lowercasing and comma-scanning the whole string.
+ */
+export function firstImageLayer(backgroundImage: string): FirstImage | null {
+  let s = backgroundImage;
+  // Trim without copying in the common no-leading/trailing-whitespace case.
+  if (s.length > 0 && (s.charCodeAt(0) <= 32 || s.charCodeAt(s.length - 1) <= 32)) {
+    s = s.trim();
+  }
+  if (!s) return null;
+  if (s.length < 16 && s.toLowerCase() === 'none') return null;
+
+  if (s.slice(0, 4).toLowerCase() === 'url(') {
+    const end = firstUrlLayerEnd(s);
+    if (end < 0) return null;
+    const url = extractUrl(s.slice(0, end));
+    return url ? { kind: 'url', url } : null;
+  }
+
   const first = splitTopLevel(s, ',')
     .map((layer) => layer.trim())
     .find(Boolean);
@@ -638,13 +698,40 @@ function firstImageLayer(backgroundImage: string): FirstImage | null {
   return null;
 }
 
+/** Index just past the closing paren of a leading `url(...)` layer, -1 if malformed. */
+function firstUrlLayerEnd(s: string): number {
+  const quote = s[4];
+  if (quote === '"' || quote === "'") {
+    let i = 5;
+    while (i < s.length) {
+      const ch = s[i];
+      if (ch === '\\') {
+        i += 2;
+        continue;
+      }
+      if (ch === quote) break;
+      i++;
+    }
+    if (i >= s.length) return -1;
+    let j = i + 1;
+    while (j < s.length && s[j] === ' ') j++;
+    return s[j] === ')' ? j + 1 : -1;
+  }
+  const close = s.indexOf(')', 4);
+  return close === -1 ? -1 : close + 1;
+}
+
 function extractUrl(token: string): string | null {
   const open = token.indexOf('(');
   const close = token.lastIndexOf(')');
   if (open < 0 || close <= open) return null;
   const raw = token.slice(open + 1, close).trim();
-  const unquoted = raw.replace(/^(['"])(.*)\1$/, '$2');
-  return unquoted || null;
+  // Unwrap matched quotes without a regex: the payload can be megabytes.
+  const quote = raw[0];
+  if ((quote === '"' || quote === "'") && raw.length >= 2 && raw[raw.length - 1] === quote) {
+    return raw.slice(1, -1) || null;
+  }
+  return raw || null;
 }
 
 /* ---------------------- image decode & sampling --------------------- */

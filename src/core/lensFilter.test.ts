@@ -37,6 +37,17 @@ describe('createLensFilter', () => {
     expect(d.passes[0]).toMatchObject({ type: 'displacement' });
   });
 
+  it('emits an identity brightness pass when it must stay animatable', () => {
+    const d = createLensFilter({ ...BASE, brightness: 1, animateBrightness: true });
+    expect(d.passes[0]).toMatchObject({ type: 'brightness', amount: 1 });
+    expect(d.passes[1]).toMatchObject({ type: 'displacement' });
+  });
+
+  it('omits the identity brightness pass when not animatable', () => {
+    const d = createLensFilter({ ...BASE, brightness: 1, animateBrightness: false });
+    expect(d.passes.some((p) => p.type === 'brightness')).toBe(false);
+  });
+
   it('splits dispersion into three RGB displacement passes blended with screen', () => {
     const d = createLensFilter({ ...BASE, dispersion: 0.5 });
     const displacements = d.passes.filter((p) => p.type === 'displacement');
@@ -52,10 +63,12 @@ describe('createLensFilter', () => {
     expect(blends.every((p) => p.mode === 'screen')).toBe(true);
   });
 
-  it('sizes the filter region for blur bleed and dispersion spread', () => {
+  it('sizes the filter region for the in-graph blur bleed only', () => {
     const d = createLensFilter({ ...BASE, blur: 4, dispersion: 0.5 });
-    const expected = Math.ceil(Math.max(4 * 1.5, 4) + 48 + 48 * 0.5 * DISPERSION_SCALE_EPSILON + 2);
-    expect(d.regionPaddingPx).toBe(expected); // 61
+    // Inward-only sampling + border-box clipping: the region beyond the
+    // element never needs displacement/dispersion headroom, only blur bleed.
+    const expected = Math.ceil(Math.max(4 * 1.5, 4) + 2);
+    expect(d.regionPaddingPx).toBe(expected); // 8
     const region = lensRegionPercent(d.width, d.height, d.regionPaddingPx);
     expect(region.x).toBe(`${(-expected / d.width) * 100}%`);
     expect(parseFloat(region.width)).toBeGreaterThan(100);

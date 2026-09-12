@@ -51,6 +51,8 @@ export interface GlassFilterSpec {
   saturation: number;
   /** Brightness multiplier (1 = unchanged). */
   brightness: number;
+  /** Emit a (possibly identity) brightness pass that setBrightness can retune. */
+  animateBrightness: boolean;
   /** Chromatic dispersion 0–1. */
   dispersion: number;
 }
@@ -70,6 +72,7 @@ interface RegistryApi {
   acquire(spec: GlassFilterSpec): string;
   release(id: string): void;
   setScale(id: string, base: number): void;
+  setBrightness(id: string, amount: number): void;
 }
 
 export const GlassFilterRegistryContext = createContext<RegistryApi | null>(null);
@@ -78,7 +81,26 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [entries, setEntries] = useState<Map<string, RegistryEntry>>(new Map());
   const idToKey = useRef(new Map<string, string>());
-  const scaleNodes = useRef(new Map<string, { node: SVGFEDisplacementMapElement; ratio: number }>());
+
+  // Mutable filter-graph nodes, indexed by filter id: the elasticity spring
+  // retunes the feDisplacementMap scales and hover boosts retune the
+  // brightness feFunc slopes in place — no React renders, no rebuilds.
+  interface FilterNodes {
+    scale: Map<number, { node: SVGFEDisplacementMapElement; ratio: number }>;
+    brightnessR: SVGComponentTransferFunctionElement | null;
+    brightnessG: SVGComponentTransferFunctionElement | null;
+    brightnessB: SVGComponentTransferFunctionElement | null;
+  }
+  const nodesRef = useRef(new Map<string, FilterNodes>());
+
+  const filterNodes = (id: string): FilterNodes => {
+    let nodes = nodesRef.current.get(id);
+    if (!nodes) {
+      nodes = { scale: new Map(), brightnessR: null, brightnessG: null, brightnessB: null };
+      nodesRef.current.set(id, nodes);
+    }
+    return nodes;
+  };
 
   const idFor = useCallback(
     (key: string) => {
@@ -107,6 +129,7 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
             blur: spec.blur,
             saturation: spec.saturation,
             brightness: spec.brightness,
+            animateBrightness: spec.animateBrightness,
             dispersion: spec.dispersion,
           });
           next.set(spec.key, {
@@ -145,21 +168,45 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   }, []);
 
   const setScale = useCallback((id: string, base: number) => {
-    scaleNodes.current.forEach(({ node, ratio }, slotId) => {
-      if (slotId.startsWith(`${id}:`)) {
-        node.setAttribute('scale', String(Math.max(0, base * ratio)));
-      }
-    });
+    const nodes = nodesRef.current.get(id);
+    if (!nodes) return;
+    for (const { node, ratio } of nodes.scale.values()) {
+      node.setAttribute('scale', String(Math.max(0, base * ratio)));
+    }
   }, []);
 
-  const api = useMemo<RegistryApi>(() => ({ acquire, release, setScale }), [acquire, release, setScale]);
+  const setBrightness = useCallback((id: string, amount: number) => {
+    const nodes = nodesRef.current.get(id);
+    if (!nodes) return;
+    const slope = String(Math.max(0, amount));
+    nodes.brightnessR?.setAttribute('slope', slope);
+    nodes.brightnessG?.setAttribute('slope', slope);
+    nodes.brightnessB?.setAttribute('slope', slope);
+  }, []);
+
+  const api = useMemo<RegistryApi>(
+    () => ({ acquire, release, setScale, setBrightness }),
+    [acquire, release, setScale, setBrightness],
+  );
 
   const scaleRef =
     (id: string, slot: number, ratio: number) =>
     (node: SVGFEDisplacementMapElement | null) => {
-      const slotId = `${id}:${slot}`;
-      if (node) scaleNodes.current.set(slotId, { node, ratio });
-      else scaleNodes.current.delete(slotId);
+      if (node) {
+        filterNodes(id).scale.set(slot, { node, ratio });
+      } else {
+        nodesRef.current.get(id)?.scale.delete(slot);
+      }
+    };
+
+  const brightnessRef =
+    (id: string, channel: 'r' | 'g' | 'b') =>
+    (node: SVGComponentTransferFunctionElement | null) => {
+      const nodes = node ? filterNodes(id) : nodesRef.current.get(id);
+      if (!nodes) return;
+      if (channel === 'r') nodes.brightnessR = node;
+      else if (channel === 'g') nodes.brightnessG = node;
+      else nodes.brightnessB = node;
     };
 
   const renderPass = (
@@ -227,9 +274,24 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
       case 'brightness':
         return (
           <feComponentTransfer key={index} in={pass.input} result={pass.result}>
-            <feFuncR type="linear" slope={pass.amount} intercept={0} />
-            <feFuncG type="linear" slope={pass.amount} intercept={0} />
-            <feFuncB type="linear" slope={pass.amount} intercept={0} />
+            <feFuncR
+              type="linear"
+              slope={pass.amount}
+              intercept={0}
+              ref={brightnessRef(id, 'r')}
+            />
+            <feFuncG
+              type="linear"
+              slope={pass.amount}
+              intercept={0}
+              ref={brightnessRef(id, 'g')}
+            />
+            <feFuncB
+              type="linear"
+              slope={pass.amount}
+              intercept={0}
+              ref={brightnessRef(id, 'b')}
+            />
           </feComponentTransfer>
         );
     }
@@ -241,6 +303,7 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
       <svg
         aria-hidden="true"
         focusable="false"
+        data-ngs-internal="all"
         style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
         colorInterpolationFilters={LENS_FILTER_COLOR_INTERPOLATION}
       >
@@ -295,6 +358,8 @@ export interface UseGlassFilterOptions {
   saturation: number;
   /** Brightness multiplier. */
   brightness: number;
+  /** Keep a retunable brightness pass so hover boosts never rebuild the graph. */
+  animateBrightness?: boolean;
   /** Chromatic dispersion 0–1. */
   dispersion: number;
 }
@@ -304,6 +369,8 @@ export interface UseGlassFilterResult {
   baseScaleRef: MutableRefObject<number>;
   /** Direct DOM mutation of the feDisplacementMap scales, safe per frame. */
   setFilterScale: (base: number) => void;
+  /** Direct DOM mutation of the brightness feFunc slopes, safe per frame. */
+  setFilterBrightness: (amount: number) => void;
 }
 
 export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResult {
@@ -314,7 +381,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   const filterIdRef = useRef<string | null>(null);
   filterIdRef.current = filterId;
 
-  const { enabled, shared, map, blur, saturation, brightness, dispersion } = opts;
+  const { enabled, shared, map, blur, saturation, brightness, animateBrightness, dispersion } = opts;
   const { width, height, radius, edge, curvature, strength, dpr } = map;
 
   useEffect(() => {
@@ -333,6 +400,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
         `b${blur}`,
         `sat${saturation}`,
         `br${brightness}`,
+        `ab${animateBrightness ? 1 : 0}`,
         `x${dispersion}`,
         `sc${Math.round(baseScale * 100)}`,
         shared ? 'shared' : instanceKey,
@@ -346,6 +414,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
         blur,
         saturation,
         brightness,
+        animateBrightness: animateBrightness ?? false,
         dispersion,
       });
       setFilterId(id);
@@ -370,6 +439,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     blur,
     saturation,
     brightness,
+    animateBrightness,
     dispersion,
     instanceKey,
   ]);
@@ -381,5 +451,12 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     [registry],
   );
 
-  return { filterId, baseScaleRef, setFilterScale };
+  const setFilterBrightness = useCallback(
+    (amount: number) => {
+      if (registry && filterIdRef.current) registry.setBrightness(filterIdRef.current, amount);
+    },
+    [registry],
+  );
+
+  return { filterId, baseScaleRef, setFilterScale, setFilterBrightness };
 }

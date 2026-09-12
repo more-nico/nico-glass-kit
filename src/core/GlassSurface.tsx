@@ -99,14 +99,12 @@ export function GlassSurface(props: GlassSurfaceProps) {
   const light = useOverLight(overLight, containerRef);
   const material = useMemo(() => resolveOptics(DEFAULT_OPTICS, optics), [optics]);
 
-  // Hover brightness boost (interactive components only): swaps the filter
-  // graph / low-tier chain to optics.brightness + hoverBrightnessBoost while
-  // the pointer is over the surface.
-  const [hovered, setHovered] = useState(false);
-  const hoverBoostActive = hovered && hoverBrightnessBoost > 0;
-  const effBrightness = hoverBoostActive
-    ? material.brightness + hoverBrightnessBoost
-    : material.brightness;
+  // Hover brightness boost (interactive components only): on filtered tiers
+  // the registry retunes the brightness feFunc slopes in place; the low-tier
+  // CSS chain is rewritten directly on the effect layer. Neither path
+  // re-renders the component nor rebuilds the filter graph.
+  const effectRef = useRef<HTMLDivElement | null>(null);
+  const hoverRef = useRef(false);
 
   const motionRef = useRef<HTMLDivElement | null>(null);
   const highlightRef = useRef<HTMLDivElement | null>(null);
@@ -145,9 +143,11 @@ export function GlassSurface(props: GlassSurfaceProps) {
 
   const needsFilter =
     resolvedQuality !== 'low' && size.width >= 2 && size.height >= 2;
-  const { filterId, baseScaleRef, setFilterScale } = useGlassFilter({
+  // hoverBrightnessBoost forces a private filter: a shared entry would leak
+  // the boosted slopes to every element with identical geometry.
+  const { filterId, baseScaleRef, setFilterScale, setFilterBrightness } = useGlassFilter({
     enabled: needsFilter,
-    shared: resolvedQuality === 'medium',
+    shared: resolvedQuality === 'medium' && hoverBrightnessBoost <= 0,
     map: {
       width: size.width,
       height: size.height,
@@ -159,9 +159,36 @@ export function GlassSurface(props: GlassSurfaceProps) {
     },
     blur: material.blur,
     saturation: material.saturation,
-    brightness: effBrightness,
-    dispersion: material.dispersion,
+    brightness: material.brightness,
+    animateBrightness: hoverBrightnessBoost > 0,
+    dispersion: resolvedQuality === 'high' ? material.dispersion : 0,
   });
+
+  const applyHoverBrightness = (active: boolean) => {
+    if (hoverBrightnessBoost <= 0) return;
+    hoverRef.current = active;
+    if (filterId && resolvedQuality !== 'low') {
+      setFilterBrightness(
+        active ? material.brightness + hoverBrightnessBoost : material.brightness,
+      );
+      return;
+    }
+    const effect = effectRef.current;
+    if (!effect) return;
+    const brightness = active ? material.brightness + hoverBrightnessBoost : material.brightness;
+    const chain = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${brightness})`;
+    effect.style.setProperty('backdrop-filter', chain);
+    effect.style.setProperty('-webkit-backdrop-filter', chain);
+  };
+
+  // If the filter arrives (or the tier upgrades) while the pointer is
+  // already over the surface, apply the pending boost to the new graph.
+  useEffect(() => {
+    if (!filterId || !hoverRef.current || hoverBrightnessBoost <= 0 || resolvedQuality === 'low') {
+      return;
+    }
+    setFilterBrightness(material.brightness + hoverBrightnessBoost);
+  }, [filterId, hoverBrightnessBoost, resolvedQuality, material.brightness, setFilterBrightness]);
 
   // High-tier mouse elasticity: animates ONLY the feDisplacementMap `scale`
   // attributes and the motion wrapper's transform — never rebuilds the map.
@@ -304,7 +331,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     };
   }, [highlightIntensity]);
 
-  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${effBrightness})`;
+  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${material.brightness})`;
   const effectStyle: CSSProperties =
     resolvedQuality !== 'low' && filterId
       ? { backdropFilter: `url(#${filterId})` }
@@ -328,18 +355,21 @@ export function GlassSurface(props: GlassSurfaceProps) {
       data-ngs-light={light ? 'true' : 'false'}
       style={surfaceStyle}
       onPointerEnter={(e: ReactPointerEvent<HTMLElement>) => {
-        if (hoverBrightnessBoost > 0) setHovered(true);
+        if (hoverBrightnessBoost > 0) applyHoverBrightness(true);
         onPointerEnter?.(e);
       }}
       onPointerLeave={(e: ReactPointerEvent<HTMLElement>) => {
-        if (hoverBrightnessBoost > 0) setHovered(false);
+        if (hoverBrightnessBoost > 0) applyHoverBrightness(false);
         onPointerLeave?.(e);
       }}
     >
-      <div className="ngs-motion" ref={motionRef}>
-        <div className="ngs-effect" style={effectStyle} />
-        <div className="ngs-highlight" ref={highlightRef} />
-        <div className="ngs-content">{children}</div>
+      {/* data-ngs-internal marks layers whose style writes are the library's
+          own per-frame churn (spring transform, specular vars, tier/hover
+          chain swaps); the shared probe scheduler ignores them. */}
+      <div className="ngs-motion" data-ngs-internal="style" ref={motionRef}>
+        <div className="ngs-effect" data-ngs-internal="style" style={effectStyle} ref={effectRef} />
+        <div className="ngs-highlight" data-ngs-internal="style" ref={highlightRef} />
+        <div className="ngs-content" data-ngs-internal="style">{children}</div>
       </div>
     </AnyComp>
   );

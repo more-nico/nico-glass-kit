@@ -8,6 +8,7 @@ import {
   type OverLight,
 } from 'nico-glass-kit';
 import { ControlPanel } from './ControlPanel';
+import { FpsMeter } from './FpsMeter';
 import { BackgroundScene, type BackgroundId } from './demos/BackgroundScene';
 import { BarsDemo } from './demos/BarsDemo';
 import { ButtonsDemo } from './demos/ButtonsDemo';
@@ -69,6 +70,8 @@ export default function App() {
       </main>
 
       <ControlPanel params={params} onChange={setParams} onUploadBg={setCustomBg} customBg={customBg} />
+
+      <FpsMeter />
 
       <GlassPill
         visible={pillVisible}

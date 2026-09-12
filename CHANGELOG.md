@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased
+
+### Performance
+
+- `overLight: 'auto'` backdrop probing now runs through one shared scheduler
+  (`backdropProbeScheduler.ts`) instead of per-element listener sets: one
+  scroll/resize/visibility/MutationObserver subscription for the whole page,
+  all pending probes batched into a single rAF pass with a ~6 ms per-frame
+  time budget. The library's own high-frequency writes no longer trigger
+  probes: `style` mutations on the internal layers (rim-light specular vars,
+  the elasticity spring's transform, tier/hover chain swaps) and everything
+  inside the hidden filter-registry SVG are ignored, while class swaps,
+  `data-ngs-light` flips and childList changes still pass through. Scrolls
+  that cannot change an element's backdrop are skipped: elements that moved
+  along with the scrolled content, and scrollers that do not overlap the
+  element. Light/Dark decisions, thresholds and hysteresis are unchanged.
+- Custom `url()` backgrounds no longer freeze the main thread: the probe
+  re-read `cs.backgroundImage` for every sample point and re-parsed the
+  layer — with a multi-megabyte data-URL wallpaper that alone cost ~1.5 s
+  per probe. The per-node analysis (string materialisation, first-layer
+  extraction, gradient parsing, `cover/center` detection) is now cached in
+  a WeakMap invalidated by the scheduler's mutation/resize triggers, and
+  `firstImageLayer`/`extractUrl` take a fast path for leading `url(...)`
+  layers (slice to the closing paren, quote unwrap without regex). Measured
+  on the playground with a 3.5 MB PNG wallpaper: 1499 ms → 0.95 ms per
+  warm probe; scroll scenarios report zero long tasks.
+- The SVG filter region shrank from `blur×1.5 + |displacement scale| +
+  dispersion + 2` (~56 px per side at the defaults) to `max(blur×1.5, 4) + 2`
+  (~7 px): the displacement map only ever samples inward and the
+  backdrop-filter output is clipped to the element's rounded border box, so
+  the outer band was never read. Filter texture area for small elements
+  drops several-fold.
+- Hover brightness boosts no longer rebuild the filter graph. The graph now
+  carries a (possibly identity) brightness `feComponentTransfer` for
+  boost-capable surfaces, and `setBrightness` retunes its `feFunc` slopes in
+  place — the same mechanism the elasticity spring uses for displacement
+  scales. Low tier rewrites its CSS chain directly on the effect layer.
+  Neither path re-renders React or re-acquires filters.
+- Chromatic dispersion is now high tier only, as documented in `optics.ts`;
+  Medium renders a single displacement pass (~40% fewer graph primitives).
+  Explicitly opt into `quality="high"` for the full dispersion look.
+
+### Notes / limitations
+
+- Surfaces with a `hoverBrightnessBoost` use private filter entries on
+  Medium (identical-geometry sharing would leak the boosted brightness to
+  sibling elements); non-interactive surfaces keep sharing.
+- If the quality tier or optics change while a pointer hovers a surface,
+  the hover brightness boost reapplies on the next pointer enter.
+- Glass surfaces' internal `style` writes are invisible to the probe
+  scheduler; a glass element stacked on another glass surface still sees
+  its `data-ngs-light` and class changes, but not its content's inline
+  style churn.
+
 ## 0.3.0
 
 ### Breaking changes

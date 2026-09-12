@@ -30,9 +30,15 @@ export interface LensFilterOptions {
   saturation?: number;
   /** Brightness multiplier (1 = unchanged). */
   brightness?: number;
+  /**
+   * Always emit the brightness pass (identity at `brightness === 1`) so the
+   * registry can retune its slopes in place, e.g. for hover boosts, without
+   * rebuilding the filter graph.
+   */
+  animateBrightness?: boolean;
   /** 0–1 chromatic dispersion amount. */
   dispersion?: number;
-  /** Filter region padding in CSS px; derived from blur/displacement when omitted. */
+  /** Filter region padding in CSS px; derived from blur when omitted. */
   regionPaddingPx?: number;
 }
 
@@ -66,6 +72,7 @@ export function createLensFilter(options: LensFilterOptions): LensFilterDescript
   const blur = Math.max(0, options.blur ?? 0);
   const saturation = options.saturation ?? 100;
   const brightness = options.brightness ?? 1;
+  const animateBrightness = options.animateBrightness ?? false;
 
   const passes: LensFilterPass[] = [];
   let stageInput = 'SourceGraphic';
@@ -83,7 +90,7 @@ export function createLensFilter(options: LensFilterOptions): LensFilterDescript
     });
     stageInput = 'ngs_sat';
   }
-  if (brightness !== 1) {
+  if (brightness !== 1 || animateBrightness) {
     passes.push({
       type: 'brightness',
       input: stageInput,
@@ -127,11 +134,14 @@ export function createLensFilter(options: LensFilterOptions): LensFilterDescript
     );
   }
 
-  // Keep the filter region wide enough for blur bleed and displacement spread.
-  const dispersionSpread = scale * dispersion * DISPERSION_SCALE_EPSILON;
+  // The displacement map only ever samples inward (its rim normals point
+  // into the shape) and the backdrop-filter output is clipped to the
+  // element's rounded border box, so the region beyond the element only
+  // needs headroom for the in-graph blur's bleed — not for the displacement
+  // scale or the dispersion spread, which are inward-only as well.
   const regionPaddingPx =
     options.regionPaddingPx ??
-    Math.ceil(Math.max(blur * 1.5, 4) + Math.abs(scale) + dispersionSpread + 2);
+    Math.ceil(Math.max(blur * 1.5, 4) + 2);
 
   return {
     mapUrl: options.mapUrl,

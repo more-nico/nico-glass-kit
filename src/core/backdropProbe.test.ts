@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   compositeOver,
   decideLight,
+  firstImageLayer,
   gradientColorAt,
   LIGHT_LUMINANCE_THRESHOLD,
   parseCssColor,
@@ -192,6 +193,40 @@ describe('parseGradient + gradientColorAt', () => {
     expect(parseGradient('url("data:image/png;base64,AAAA")')).toBeNull();
     expect(parseGradient('none')).toBeNull();
     expect(parseGradient('linear-gradient(rgb(0 0 0))')).toBeNull();
+  });
+});
+
+describe('firstImageLayer', () => {
+  it('extracts a megabyte data url as the first layer', () => {
+    const url = `data:image/png;base64,${'A'.repeat(1_000_000)}`;
+    const r = firstImageLayer(`url("${url}")`);
+    expect(r).toEqual({ kind: 'url', url });
+  });
+
+  it('extracts unquoted and quoted urls, including commas inside quotes', () => {
+    expect(firstImageLayer('url(a.png)')).toEqual({ kind: 'url', url: 'a.png' });
+    expect(firstImageLayer(`url("b.png")`)).toEqual({ kind: 'url', url: 'b.png' });
+    expect(firstImageLayer(`url("c,d.png")`)).toEqual({ kind: 'url', url: 'c,d.png' });
+  });
+
+  it('takes only the first layer of a multi-layer background', () => {
+    expect(firstImageLayer('url(a.png), linear-gradient(rgb(0 0 0), rgb(255 255 255))')).toEqual({
+      kind: 'url',
+      url: 'a.png',
+    });
+  });
+
+  it('returns a gradient layer for gradient-first backgrounds', () => {
+    const layer = 'linear-gradient(rgb(255 0 0), rgb(0 0 255))';
+    expect(firstImageLayer(layer)).toEqual({ kind: 'gradient', layer });
+    expect(firstImageLayer(`${layer}, url(a.png)`)).toEqual({ kind: 'gradient', layer });
+  });
+
+  it('returns null for none, empty and unpaintable values', () => {
+    expect(firstImageLayer('none')).toBeNull();
+    expect(firstImageLayer('NONE')).toBeNull();
+    expect(firstImageLayer('')).toBeNull();
+    expect(firstImageLayer('cross-fade(url(a.png), white))')).toBeNull();
   });
 });
 
