@@ -1,0 +1,66 @@
+/**
+ * nico-glass-kit design tokens.
+ * Dark-over-background values are the default; elements rendered over light
+ * backgrounds carry `[data-ngs-light="true"]` which swaps the token set.
+ */
+:root {
+  /* blur / saturation */
+  --ngs-blur: 12px;
+  --ngs-saturation: 140%;
+
+  /* radii */
+  --ngs-radius-sm: 12px;
+  --ngs-radius-md: 20px;
+  --ngs-radius-lg: 28px;
+  --ngs-radius-capsule: 999px;
+
+  /* motion */
+  --ngs-transition-fast: 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ngs-transition: 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* typography */
+  --ngs-font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+
+  /* over-dark (default) tinting */
+  --ngs-tint: rgba(18, 20, 28, 0.18);
+  --ngs-tint-strong: rgba(255, 255, 255, 0.14);
+  --ngs-tint-hover: rgba(255, 255, 255, 0.18);
+  --ngs-active-bg: rgba(255, 255, 255, 0.22);
+  --ngs-text: rgba(255, 255, 255, 0.94);
+  --ngs-text-dim: rgba(255, 255, 255, 0.62);
+
+  /* rim light (over dark) */
+  --ngs-rim-top: rgba(255, 255, 255, 0.5);
+  --ngs-rim-top-soft: rgba(255, 255, 255, 0.16);
+  --ngs-rim-edge: rgba(255, 255, 255, 0.28);
+  --ngs-rim-bottom: rgba(0, 0, 0, 0.22);
+
+  /* shadow (over dark) */
+  --ngs-shadow: 0 10px 32px rgba(0, 0, 0, 0.34);
+  --ngs-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.28);
+
+  /* fallback (no backdrop-filter support): mostly opaque */
+  --ngs-tint-fallback: rgba(26, 28, 38, 0.88);
+}
+
+/* over-light token set */
+.ngs-surface[data-ngs-light='true'] {
+  --ngs-tint: rgba(255, 255, 255, 0.32);
+  --ngs-tint-strong: rgba(255, 255, 255, 0.5);
+  --ngs-tint-hover: rgba(255, 255, 255, 0.58);
+  --ngs-active-bg: rgba(255, 255, 255, 0.66);
+  --ngs-text: rgba(10, 12, 20, 0.88);
+  --ngs-text-dim: rgba(10, 12, 20, 0.56);
+
+  --ngs-rim-top: rgba(255, 255, 255, 0.9);
+  --ngs-rim-top-soft: rgba(255, 255, 255, 0.4);
+  --ngs-rim-edge: rgba(255, 255, 255, 0.65);
+  --ngs-rim-bottom: rgba(0, 0, 0, 0.1);
+
+  --ngs-shadow: 0 10px 32px rgba(15, 20, 40, 0.16);
+  --ngs-shadow-sm: 0 4px 16px rgba(15, 20, 40, 0.12);
+
+  --ngs-tint-fallback: rgba(244, 246, 252, 0.92);
+}

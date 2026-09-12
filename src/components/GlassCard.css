@@ -1,0 +1,4 @@
+.ngs-card {
+  display: block;
+  box-shadow: var(--ngs-shadow);
+}

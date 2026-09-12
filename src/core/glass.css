@@ -1,0 +1,125 @@
+/* GlassSurface layer stack + Low tier styles (the base every tier builds on). */
+
+.ngs-surface {
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  font-family: var(--ngs-font-family);
+  color: var(--ngs-text);
+  box-shadow: var(--ngs-shadow-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Fills the container so the effect/highlight layers (absolute inset-0)
+ * always cover the full element box — e.g. fixed-size icon buttons where the
+ * content alone would only span the icon's height. Flex column keeps the
+ * content layer stretched (and thus centered) in both axes.
+ */
+.ngs-motion {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  will-change: transform;
+  display: flex;
+  flex-direction: column;
+}
+
+.ngs-effect,
+.ngs-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Backdrop layer: tint is CSS in every tier so degradation stays consistent. */
+.ngs-effect {
+  z-index: 0;
+  background: var(--ngs-tint);
+  transition: opacity var(--ngs-transition);
+}
+
+/* No backdrop-filter at all: fall back to a mostly opaque fill. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ngs-effect {
+    background: var(--ngs-tint-fallback);
+  }
+}
+
+/*
+ * Rim-light layer:
+ *  - base: uniform inset edge lines + a uniform 1px gradient border (even all
+ *    around, no static blob);
+ *  - specular: driven by --ngx/--ngy/--ngs-spec-o (set from JS on pointer
+ *    move) — a soft inner sheen plus an edge-ring glint that follows the
+ *    pointer; --ngs-spec-o is 0 without a pointer, so the rim stays uniform.
+ *  - --ngs-hl (highlightIntensity) scales every highlight channel.
+ */
+.ngs-highlight {
+  z-index: 1;
+  background: radial-gradient(
+    200px circle at var(--ngx, 50%) var(--ngy, 50%),
+    rgb(255 255 255 / calc(0.08 * var(--ngs-spec-o, 0) * var(--ngs-hl, 1))),
+    transparent 70%
+  );
+  box-shadow:
+    inset 0 1px 0 var(--ngs-rim-top-soft),
+    inset 0 -1px 0 var(--ngs-rim-bottom);
+}
+
+.ngs-highlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    160deg,
+    var(--ngs-rim-top) 0%,
+    var(--ngs-rim-edge) 22%,
+    rgba(255, 255, 255, 0.04) 45%,
+    rgba(255, 255, 255, 0.02) 60%,
+    var(--ngs-rim-edge) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: calc(0.8 * var(--ngs-hl, 1));
+}
+
+/* Pointer-following specular glint, masked to a 2px edge ring. */
+.ngs-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: radial-gradient(
+    140px circle at var(--ngx, 50%) var(--ngy, 50%),
+    rgb(255 255 255 / calc(0.65 * var(--ngs-spec-o, 0) * var(--ngs-hl, 1))),
+    rgb(255 255 255 / calc(0.18 * var(--ngs-spec-o, 0) * var(--ngs-hl, 1))) 40%,
+    transparent 70%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.ngs-content {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+}

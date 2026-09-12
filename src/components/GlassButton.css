@@ -1,0 +1,91 @@
+.ngs-btn {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--ngs-transition-fast);
+}
+
+.ngs-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ngs-btn .ngs-effect {
+  transition:
+    opacity var(--ngs-transition),
+    background-color var(--ngs-transition-fast);
+}
+
+.ngs-btn:not(:disabled):hover .ngs-effect {
+  background-color: var(--ngs-tint-hover);
+}
+
+.ngs-btn:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.ngs-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.ngs-btn-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.ngs-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.ngs-btn-icon svg {
+  width: 1.15em;
+  height: 1.15em;
+  display: block;
+}
+
+/* capsule sizes */
+.ngs-btn--capsule.ngs-btn--sm .ngs-btn-content {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.ngs-btn--capsule.ngs-btn--md .ngs-btn-content {
+  padding: 10px 20px;
+  font-size: 15px;
+}
+.ngs-btn--capsule.ngs-btn--lg .ngs-btn-content {
+  padding: 14px 28px;
+  font-size: 17px;
+}
+
+/* icon sizes */
+.ngs-btn--icon.ngs-btn--sm {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+.ngs-btn--icon.ngs-btn--md {
+  width: 40px;
+  height: 40px;
+  font-size: 17px;
+}
+.ngs-btn--icon.ngs-btn--lg {
+  width: 52px;
+  height: 52px;
+  font-size: 21px;
+}
