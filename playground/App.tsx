@@ -32,7 +32,7 @@ const DEFAULT_PARAMS: DemoParams = {
   overLight: 'auto',
   optics: { ...DEFAULT_OPTICS },
   highlight: 1,
-  elasticity: 0.15,
+  elasticity: 0.2,
   cornerRadius: 32,
   background: 'aurora',
 };

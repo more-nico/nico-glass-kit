@@ -3,14 +3,14 @@ import { DEFAULT_OPTICS, opticsToCssVars, resolveOptics } from './optics';
 
 describe('DEFAULT_OPTICS', () => {
   it('matches the ported house material defaults', () => {
-    expect(DEFAULT_OPTICS.blur).toBe(4);
+    expect(DEFAULT_OPTICS.blur).toBe(3);
     expect(DEFAULT_OPTICS.saturation).toBe(100);
     expect(DEFAULT_OPTICS.brightness).toBe(1.1);
     expect(DEFAULT_OPTICS.tint).toBe('light-dark(rgb(255 255 255), rgb(18 20 26))');
     expect(DEFAULT_OPTICS.tintStrength).toBe(0.2);
     expect(DEFAULT_OPTICS.refraction).toBe(1);
-    expect(DEFAULT_OPTICS.depth).toBe(10);
-    expect(DEFAULT_OPTICS.curvature).toBe(0.49);
+    expect(DEFAULT_OPTICS.depth).toBe(8);
+    expect(DEFAULT_OPTICS.curvature).toBe(0.2);
     expect(DEFAULT_OPTICS.dispersion).toBe(0.1);
   });
 });
@@ -54,14 +54,14 @@ describe('resolveOptics', () => {
 describe('opticsToCssVars', () => {
   it('maps every optics key to its public CSS variable', () => {
     const vars = opticsToCssVars(DEFAULT_OPTICS);
-    expect(vars['--ngs-glass-blur']).toBe('4px');
+    expect(vars['--ngs-glass-blur']).toBe('3px');
     expect(vars['--ngs-glass-saturation']).toBe('100%');
     expect(vars['--ngs-glass-brightness']).toBe('1.1');
     expect(vars['--ngs-glass-tint']).toBe(DEFAULT_OPTICS.tint);
     expect(vars['--ngs-glass-tint-strength']).toBe('0.2');
     expect(vars['--ngs-lens-refraction']).toBe('1');
-    expect(vars['--ngs-lens-depth']).toBe('10px');
-    expect(vars['--ngs-lens-curvature']).toBe('0.49');
+    expect(vars['--ngs-lens-depth']).toBe('8px');
+    expect(vars['--ngs-lens-curvature']).toBe('0.2');
     expect(vars['--ngs-lens-dispersion']).toBe('0.1');
   });
 

@@ -26,9 +26,9 @@ graph and RGB-split chromatic dispersion.
   `bezelWidth`, `profile`. Kept as separate props: `cornerRadius`,
   `highlightIntensity`, `elasticity`, `quality`, `overLight`.
 
-  The nine adjustable knobs and their defaults (Blur 4px, Saturation 100%,
+  The nine adjustable knobs and their defaults (Blur 3px, Saturation 100%,
   Brightness 1.1, Tint `light-dark(rgb(255 255 255), rgb(18 20 26))`,
-  Tint strength 0.2, Refraction 1, Depth 10px, Curvature 0.49,
+  Tint strength 0.2, Refraction 1, Depth 8px, Curvature 0.2,
   Dispersion 0.1) come from `DEFAULT_OPTICS` in `src/core/optics.ts`.
 
 - Removed the Snell/surface-profile engine and its public exports
@@ -41,6 +41,15 @@ graph and RGB-split chromatic dispersion.
   `DEFAULT_OPTICS`, `resolveOptics`, `opticsToCssVars`, `generateLensMap`,
   `clearLensMapCache`, `lensMapCacheStats`, `GlassOptics`, `GlassExtras`,
   `LensMapOptions`, `LensMapResult`.
+
+### Added
+
+- `hoverBrightnessBoost`: while the pointer hovers the surface, brightness
+  becomes `optics.brightness + hoverBrightnessBoost` (rim-light glint
+  unchanged). `GlassSurface` defaults to 0 (off); `GlassButton` defaults to
+  0.5; `GlassTabBar`, `GlassCard`, `GlassNavBar` and `GlassPill` accept the
+  prop (off unless set). Works on every quality tier — high/medium swap the
+  filter graph, low rewrites the backdrop chain.
 
 ### Playground
 

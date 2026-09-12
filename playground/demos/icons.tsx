@@ -92,3 +92,35 @@ export const PlusIcon = (p: SVGProps<SVGSVGElement>) =>
       <path d="M5 12h14" />
     </>,
   );
+
+export const HackerNewsIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <path d="M7 4l5 8 5-8" />
+      <path d="M12 12v8" />
+    </>,
+  );
+
+export const WikipediaIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" />
+    </>,
+  );
+
+export const SolidotIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(p, <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />);
+
+export const NprIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v4" />
+    </>,
+  );

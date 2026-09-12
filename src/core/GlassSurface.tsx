@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type ElementType,
   type HTMLAttributes,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
 import { useGlassQuality, type GlassQuality } from './useGlassQuality';
@@ -28,8 +29,14 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
    * over {@link DEFAULT_OPTICS}.
    */
   optics?: Partial<GlassOptics>;
-  /** Mouse elasticity 0..1 (High tier; 0 = rigid). Default 0.15. */
+  /** Mouse elasticity 0..1 (High tier; 0 = rigid). Default 0.2. */
   elasticity?: number;
+  /**
+   * Extra brightness added on top of the configured optics brightness while
+   * the pointer hovers the surface. 0 = off (default). GlassButton defaults
+   * this to 0.5.
+   */
+  hoverBrightnessBoost?: number;
   /**
    * Rim-light strength multiplier (0 = off). The specular glint follows the
    * pointer; without a pointer the rim stays uniform. Default 1.
@@ -43,7 +50,7 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
 /** Glass-related prop subset shared by every ready-made component. */
 export type GlassExtras = Pick<
   GlassSurfaceProps,
-  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
+  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity' | 'hoverBrightnessBoost'
 >;
 
 interface SpringState {
@@ -72,8 +79,11 @@ export function GlassSurface(props: GlassSurfaceProps) {
     overLight,
     cornerRadius = 20,
     optics,
-    elasticity = 0.15,
+    elasticity = 0.2,
     highlightIntensity = 1,
+    hoverBrightnessBoost = 0,
+    onPointerEnter,
+    onPointerLeave,
     className,
     style,
     children,
@@ -83,6 +93,15 @@ export function GlassSurface(props: GlassSurfaceProps) {
   const resolvedQuality = useGlassQuality(quality);
   const light = useOverLight(overLight);
   const material = useMemo(() => resolveOptics(DEFAULT_OPTICS, optics), [optics]);
+
+  // Hover brightness boost (interactive components only): swaps the filter
+  // graph / low-tier chain to optics.brightness + hoverBrightnessBoost while
+  // the pointer is over the surface.
+  const [hovered, setHovered] = useState(false);
+  const hoverBoostActive = hovered && hoverBrightnessBoost > 0;
+  const effBrightness = hoverBoostActive
+    ? material.brightness + hoverBrightnessBoost
+    : material.brightness;
 
   const containerRef = useRef<HTMLElement | null>(null);
   const motionRef = useRef<HTMLDivElement | null>(null);
@@ -136,7 +155,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     },
     blur: material.blur,
     saturation: material.saturation,
-    brightness: material.brightness,
+    brightness: effBrightness,
     dispersion: material.dispersion,
   });
 
@@ -281,7 +300,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     };
   }, [highlightIntensity]);
 
-  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${material.brightness})`;
+  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${effBrightness})`;
   const effectStyle: CSSProperties =
     resolvedQuality !== 'low' && filterId
       ? { backdropFilter: `url(#${filterId})` }
@@ -304,6 +323,14 @@ export function GlassSurface(props: GlassSurfaceProps) {
       data-ngs-quality={resolvedQuality}
       data-ngs-light={light ? 'true' : 'false'}
       style={surfaceStyle}
+      onPointerEnter={(e: ReactPointerEvent<HTMLElement>) => {
+        if (hoverBrightnessBoost > 0) setHovered(true);
+        onPointerEnter?.(e);
+      }}
+      onPointerLeave={(e: ReactPointerEvent<HTMLElement>) => {
+        if (hoverBrightnessBoost > 0) setHovered(false);
+        onPointerLeave?.(e);
+      }}
     >
       <div className="ngs-motion" ref={motionRef}>
         <div className="ngs-effect" style={effectStyle} />

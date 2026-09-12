@@ -30,14 +30,14 @@ export interface GlassOptics {
 
 export const DEFAULT_OPTICS: GlassOptics = {
   // A clear pane: almost no blur, so the refraction band is what reads as glass.
-  blur: 4,
+  blur: 3,
   saturation: 100,
   brightness: 1.1,
   tint: 'light-dark(rgb(255 255 255), rgb(18 20 26))',
   tintStrength: 0.2,
   refraction: 1,
-  depth: 10,
-  curvature: 0.49,
+  depth: 8,
+  curvature: 0.2,
   // A trace of dispersion: enough to fringe the rim without becoming a rainbow.
   dispersion: 0.1,
 };

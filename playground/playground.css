@@ -413,10 +413,10 @@ code {
 
 .phone-frame {
   position: relative;
-  width: 420px;
+  width: 504px;
   max-width: 100%;
-  height: 720px;
-  border-radius: 44px;
+  height: 864px;
+  border-radius: 53px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
@@ -460,9 +460,9 @@ code {
 /* 三件式悬浮顶栏：容器不拦截指针，玻璃件各自恢复交互 */
 .feed-topbar {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -474,6 +474,13 @@ code {
   pointer-events: auto;
 }
 
+/* 左右圆钮与中间胶囊等高对齐（52 ≈ 胶囊 16 + 19.2 + 1 + 15.6） */
+.feed-topbar .ngs-btn--icon.ngs-btn--sm {
+  width: 52px;
+  height: 52px;
+  font-size: 18px;
+}
+
 /*
  * 中间时间胶囊：玻璃层只盖容器 content box（.ngs-motion 100% 不含 padding），
  * 所以 padding 必须放内层 .ngs-content，材质保持套件默认。
@@ -483,21 +490,70 @@ code {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 7px 28px;
+  padding: 8px 34px;
 }
 
 .feed-clock-primary {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.2;
 }
 
 .feed-clock-secondary {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.2;
   color: var(--ngs-text-dim);
   font-variant-numeric: tabular-nums;
+}
+
+/* 设备框内的 GlassTabBar 随设备等比放大（仅本 demo 作用域，组件本体不动）：
+   槽位 85×64、间距 5、内边距 7 → bar 369 = 7+85×4+5×3+7，宽向加宽约 10%；
+   槽位带中心 y=53 */
+.phone-frame .ngs-tabbar-inner {
+  gap: 5px;
+  padding: 7px;
+}
+
+.phone-frame .ngs-tab {
+  min-width: 85px;
+  height: 64px;
+  padding: 0 19px;
+}
+
+.phone-frame .ngs-tab-label {
+  font-size: 12px;
+  line-height: 14px;
+}
+
+/* 底部信息源按钮：独立玻璃层逐片叠在 GlassTabBar 之上（z 101 > bar 的 100）。
+   按钮 85×64 与槽位完全同尺寸（中心 y=53，bottom 21），激活高亮胶囊正好藏在
+   按钮玻璃正后方，不会露出叠层边缘；bar 与按钮同为 7px 内缩网格。
+   color 必须显式取 --ngs-text：.ngs-btn 的 color:inherit 会绕过玻璃件的
+   明暗自适应，导致浅色材质上白字不可见。
+   left 由内联 calc 给出（槽位 i = 50% − 177.5px + i×90px） */
+.feed-tab-btn {
+  position: absolute;
+  bottom: 21px;
+  width: 85px;
+  height: 64px;
+  z-index: 101;
+  color: var(--ngs-text);
+}
+
+/* 图标在上、文字在下（覆盖 sm 胶囊的横排默认样式）。
+   22px 图标对 13px 文字，gap 5 让上下视觉重量均衡 */
+.feed-tab-btn.ngs-btn--sm .ngs-btn-content {
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.feed-tab-btn.ngs-btn--sm .ngs-btn-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* ---------- control panel ---------- */

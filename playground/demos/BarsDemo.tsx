@@ -1,27 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { GlassButton, GlassSurface, GlassTabBar } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
-import { ChevronLeftIcon, EllipsisIcon } from './icons';
+import {
+  ChevronLeftIcon,
+  EllipsisIcon,
+  HackerNewsIcon,
+  NprIcon,
+  SolidotIcon,
+  WikipediaIcon,
+} from './icons';
 
 interface FeedSource {
   key: string;
   label: string;
   url: string;
+  icon: ReactNode;
 }
 
 /** 公网可嵌入信息流源（响应头已实测）。
  *  被拦截禁用：news.ycombinator.com (XFO DENY) · lite.cnn.com / arxiv.org (frame-ancestors 'none')。
  *  备选池：https://en.m.wikipedia.org/wiki/Wikipedia:Featured_articles */
 const FEEDS: FeedSource[] = [
-  { key: 'hn', label: 'HN', url: 'https://hn.algolia.com/' },
+  { key: 'hn', label: 'HN', url: 'https://hn.algolia.com/', icon: <HackerNewsIcon /> },
   {
     key: 'wiki',
     label: '维基',
     url: 'https://en.wikipedia.org/wiki/Portal:Current_events',
+    icon: <WikipediaIcon />,
   },
-  { key: 'solidot', label: 'Solidot', url: 'https://www.solidot.org/' },
-  { key: 'npr', label: 'NPR', url: 'https://text.npr.org/' },
+  {
+    key: 'solidot',
+    label: 'Solidot',
+    url: 'https://www.solidot.org/',
+    icon: <SolidotIcon />,
+  },
+  { key: 'npr', label: 'NPR', url: 'https://text.npr.org/', icon: <NprIcon /> },
 ];
 
 function formatClock(date: Date) {
@@ -95,13 +109,32 @@ export function BarsDemo({ params }: { params: DemoParams }) {
                 {...glass}
               />
             </div>
+            {/* 底部信息源切换：GlassTabBar 留最底（label 用 nbsp 占位、不可见）；
+                上面各自独立叠 4 个真 GlassButton（分图层，无包裹容器），逐片压在
+                四颗槽位上：悬停按钮 = 按钮自身滤镜亮度 +0.5，点击切源。
+                GlassTabBar 组件零改动。 */}
             <GlassTabBar
-              items={FEEDS.map(({ key, label }) => ({ key, label }))}
+              items={FEEDS.map(({ key }) => ({ key, label: '\u00A0' }))}
               activeKey={active}
               onChange={selectFeed}
-              style={{ position: 'absolute', bottom: 12 }}
+              style={{ position: 'absolute', bottom: 14 }}
               {...glass}
             />
+            {FEEDS.map((feed, i) => (
+              <GlassButton
+                key={feed.key}
+                size="sm"
+                className="feed-tab-btn"
+                icon={feed.icon}
+                style={{ left: `calc(50% - 177.5px + ${i * 90}px)` }}
+                aria-pressed={feed.key === active}
+                aria-label={`切换到 ${feed.label}`}
+                onClick={() => selectFeed(feed.key)}
+                {...glass}
+              >
+                {feed.label}
+              </GlassButton>
+            ))}
           </div>
         </div>
       </div>

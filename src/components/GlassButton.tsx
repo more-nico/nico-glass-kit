@@ -10,6 +10,11 @@ export interface GlassButtonProps
   /** Default `'md'`. */
   size?: 'sm' | 'md' | 'lg';
   icon?: ReactNode;
+  /**
+   * Extra brightness added to the configured optics brightness while hovered.
+   * Default 0.5. Pass 0 to disable. No effect while `disabled`.
+   */
+  hoverBrightnessBoost?: number;
 }
 
 /** Glass button: capsule or round icon variant, with hover/press feedback. */
@@ -18,6 +23,8 @@ export function GlassButton(props: GlassButtonProps) {
     variant = 'capsule',
     size = 'md',
     icon,
+    disabled,
+    hoverBrightnessBoost = 0.5,
     className,
     children,
     // glass extras
@@ -49,6 +56,7 @@ export function GlassButton(props: GlassButtonProps) {
       optics={optics}
       elasticity={elasticity}
       highlightIntensity={highlightIntensity}
+      hoverBrightnessBoost={disabled ? 0 : hoverBrightnessBoost}
       {...rest}
     >
       <span className="ngs-btn-content">
