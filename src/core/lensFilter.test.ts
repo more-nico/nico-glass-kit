@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   createLensFilter,
   DISPERSION_SCALE_EPSILON,
-  isSourceAreaSafe,
   lensChannelMatrix,
   lensPassScaleRatios,
   lensRegionPercent,
@@ -60,11 +59,6 @@ describe('createLensFilter', () => {
     const region = lensRegionPercent(d.width, d.height, d.regionPaddingPx);
     expect(region.x).toBe(`${(-expected / d.width) * 100}%`);
     expect(parseFloat(region.width)).toBeGreaterThan(100);
-  });
-
-  it('flags oversized source areas for degradation', () => {
-    expect(isSourceAreaSafe(800, 600, 1)).toBe(true);
-    expect(isSourceAreaSafe(1600, 1200, 2)).toBe(false);
   });
 });
 

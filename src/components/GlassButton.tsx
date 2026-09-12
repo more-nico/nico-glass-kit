@@ -1,11 +1,6 @@
 import { type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { GlassSurface, type GlassSurfaceProps } from '../core/GlassSurface';
+import { GlassSurface, type GlassExtras } from '../core/GlassSurface';
 import './GlassButton.css';
-
-type GlassExtras = Pick<
-  GlassSurfaceProps,
-  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
->;
 
 export interface GlassButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,

@@ -1,11 +1,6 @@
 import { useEffect, useState, type HTMLAttributes, type ReactNode } from 'react';
-import { GlassSurface, type GlassSurfaceProps } from '../core/GlassSurface';
+import { GlassSurface, type GlassExtras } from '../core/GlassSurface';
 import './GlassPill.css';
-
-type GlassExtras = Pick<
-  GlassSurfaceProps,
-  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
->;
 
 export interface GlassPillProps extends HTMLAttributes<HTMLDivElement>, GlassExtras {
   icon?: ReactNode;

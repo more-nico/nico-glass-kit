@@ -9,15 +9,6 @@
 
 export const LENS_FILTER_COLOR_INTERPOLATION = 'sRGB';
 
-export const DEFAULT_FILTER_REGION_PADDING = 0.1;
-
-/**
- * Conservative source-graphic ceiling. Safari breaks large filter sources
- * into mismatched blocks or drops the filter entirely past its internal
- * limit; blocks are safer than graphics.
- */
-export const DEFAULT_MAX_SOURCE_AREA = 1_440_000;
-
 export const DISPERSION_SCALE_EPSILON = 0.2;
 
 export type LensFilterPass =
@@ -43,8 +34,6 @@ export interface LensFilterOptions {
   dispersion?: number;
   /** Filter region padding in CSS px; derived from blur/displacement when omitted. */
   regionPaddingPx?: number;
-  dpr?: number;
-  maxSourceArea?: number;
 }
 
 export interface LensFilterDescriptor {
@@ -58,18 +47,7 @@ export interface LensFilterDescriptor {
   dispersion: number;
   /** Region padding in CSS px (blur bleed + dispersion spread). */
   regionPaddingPx: number;
-  sourceArea: number;
-  exceedsSourceArea: boolean;
   passes: LensFilterPass[];
-}
-
-export function isSourceAreaSafe(
-  width: number,
-  height: number,
-  dpr = 1,
-  maxSourceArea = DEFAULT_MAX_SOURCE_AREA,
-): boolean {
-  return width * height * dpr * dpr <= maxSourceArea;
 }
 
 function clamp01(value: number): number {
@@ -82,11 +60,8 @@ function round6(value: number): number {
 
 export function createLensFilter(options: LensFilterOptions): LensFilterDescriptor {
   const dispersion = clamp01(options.dispersion ?? 0);
-  const dpr = options.dpr ?? 1;
   const width = Math.max(0, options.width);
   const height = Math.max(0, options.height);
-  const sourceArea = width * height * dpr * dpr;
-  const maxSourceArea = options.maxSourceArea ?? DEFAULT_MAX_SOURCE_AREA;
   const scale = options.scale;
   const blur = Math.max(0, options.blur ?? 0);
   const saturation = options.saturation ?? 100;
@@ -168,31 +143,8 @@ export function createLensFilter(options: LensFilterOptions): LensFilterDescript
     brightness,
     dispersion,
     regionPaddingPx,
-    sourceArea,
-    exceedsSourceArea: sourceArea > maxSourceArea,
     passes,
   };
-}
-
-/**
- * Signature of the inputs that must invalidate a shared filter entry.
- * Geometry-only moves do not change the map, so identical-shape elements
- * keep sharing one node across them.
- */
-export function lensFilterSignature(
-  descriptor: Pick<
-    LensFilterDescriptor,
-    'mapUrl' | 'scale' | 'blur' | 'saturation' | 'brightness' | 'dispersion'
-  >,
-): string {
-  return [
-    descriptor.mapUrl,
-    descriptor.scale,
-    descriptor.blur,
-    descriptor.saturation,
-    descriptor.brightness,
-    descriptor.dispersion,
-  ].join('|');
 }
 
 export function lensChannelMatrix(channel: 'r' | 'g' | 'b'): string {

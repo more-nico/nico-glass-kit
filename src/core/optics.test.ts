@@ -40,6 +40,15 @@ describe('resolveOptics', () => {
     expect(merged.blur).toBe(DEFAULT_OPTICS.blur);
     expect(merged.depth).toBe(16);
   });
+
+  it('ignores hostile own keys instead of copying them', () => {
+    const hostile = JSON.parse('{"__proto__": {"polluted": true}, "blur": 26, "constructor": {"x": 1}}');
+    const merged = resolveOptics(DEFAULT_OPTICS, hostile);
+    expect(merged.blur).toBe(26);
+    expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);
+    expect((merged as unknown as Record<string, unknown>).polluted).toBeUndefined();
+    expect((merged as unknown as Record<string, unknown>).x).toBeUndefined();
+  });
 });
 
 describe('opticsToCssVars', () => {

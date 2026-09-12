@@ -40,6 +40,12 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   children?: ReactNode;
 }
 
+/** Glass-related prop subset shared by every ready-made component. */
+export type GlassExtras = Pick<
+  GlassSurfaceProps,
+  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
+>;
+
 interface SpringState {
   scale: number;
   tx: number;

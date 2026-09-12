@@ -83,10 +83,6 @@ export function clearLensMapCache(): void {
   stats.size = 0;
 }
 
-export function lensMapCacheSize(): number {
-  return cache.size;
-}
-
 const clamp = (value: number, min: number, max: number): number =>
   value < min ? min : value > max ? max : value;
 

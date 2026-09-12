@@ -1,11 +1,6 @@
 import { type HTMLAttributes } from 'react';
-import { GlassSurface, type GlassSurfaceProps } from '../core/GlassSurface';
+import { GlassSurface, type GlassExtras } from '../core/GlassSurface';
 import './GlassCard.css';
-
-type GlassExtras = Pick<
-  GlassSurfaceProps,
-  'quality' | 'overLight' | 'optics' | 'elasticity' | 'highlightIntensity'
->;
 
 export interface GlassCardProps extends HTMLAttributes<HTMLDivElement>, GlassExtras {
   /** Content padding, px number or any CSS value. Default 20. */

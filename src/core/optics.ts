@@ -44,14 +44,19 @@ export const DEFAULT_OPTICS: GlassOptics = {
 
 export type OpticsInput = Partial<GlassOptics> | null | undefined;
 
+const OPTICS_KEYS = Object.keys(DEFAULT_OPTICS) as Array<keyof GlassOptics>;
+
 /** Merge an ordered list of layers (defaults first, last layer wins). */
 export function resolveOptics(...layers: OpticsInput[]): GlassOptics {
   const result: GlassOptics = { ...DEFAULT_OPTICS };
   for (const layer of layers) {
     if (!layer) continue;
-    for (const [key, value] of Object.entries(layer)) {
+    // Key allowlist: never copy arbitrary keys, so a hostile layer carrying
+    // own `__proto__`/`constructor` keys cannot touch the merged object.
+    for (const key of OPTICS_KEYS) {
+      const value = (layer as Record<string, unknown>)[key];
       if (value === undefined) continue;
-      (result as unknown as Record<string, unknown>)[key] = value;
+      (result as Record<keyof GlassOptics, string | number>)[key] = value as string | number;
     }
   }
   return result;

@@ -29,6 +29,7 @@ import {
 import { generateLensMap, lensMapCacheKey, type LensMapOptions } from './displacementMap';
 import {
   createLensFilter,
+  LENS_FILTER_COLOR_INTERPOLATION,
   lensChannelMatrix,
   lensPassScaleRatios,
   lensRegionPercent,
@@ -241,7 +242,7 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
         aria-hidden="true"
         focusable="false"
         style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
-        colorInterpolationFilters="sRGB"
+        colorInterpolationFilters={LENS_FILTER_COLOR_INTERPOLATION}
       >
         <defs>
           {[...entries.values()].map(({ id, mapUrl, width, height, passes, ratios, region }) => {
@@ -255,7 +256,7 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
                 y={region.y}
                 width={region.width}
                 height={region.height}
-                colorInterpolationFilters="sRGB"
+                colorInterpolationFilters={LENS_FILTER_COLOR_INTERPOLATION}
               >
                 {/*
                   * The displacement map. preserveAspectRatio=none stretches the
