@@ -7,6 +7,9 @@ export type { GlassConfig, GlassProviderProps } from './core/GlassProvider';
 export { GlassSurface } from './core/GlassSurface';
 export type { GlassSurfaceProps } from './core/GlassSurface';
 
+export { GlassLightGroup } from './core/GlassLightGroup';
+export type { GlassLightGroupProps } from './core/GlassLightGroup';
+
 export { useGlassQuality } from './core/useGlassQuality';
 export type { GlassQuality } from './core/useGlassQuality';
 export { useOverLight } from './core/useOverLight';

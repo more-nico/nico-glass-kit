@@ -28,10 +28,24 @@ import { invalidateBackdropPaintInfo, onImagesSettled } from './backdropProbe';
 const PROBE_THROTTLE_MS = 120;
 const PROBE_BUDGET_MS = 6;
 const INTERNAL_ATTR = 'data-ngs-internal';
+/**
+ * A `data-ngs-light` flip animates the tint over `--ngs-transition` (240 ms).
+ * Probing before it settles would read the mid-transition colour and can lock
+ * an overlapping element into the wrong mode (see CHANGELOG / AGENTS.md), so
+ * mutation-triggered probes are deferred past this window. Scroll/resize
+ * triggers are unaffected.
+ */
+const LIGHT_SETTLE_MS = 260;
 
 export interface ProbeTarget {
   /** Element to probe; read at decision/run time so element swaps survive. */
   readonly el: HTMLElement | null;
+  /**
+   * Optional group region used for scroll decisions instead of `el`'s rect.
+   * A group spans several elements, so the union rect decides whether a
+   * scroll could have changed any of their backdrops.
+   */
+  readonly region?: () => ScrollRect | null;
   /** Probe + Light/Dark decision; keeps its own hidden/offscreen guards. */
   run(): void;
 }
@@ -56,6 +70,17 @@ export function isInternalMutation(record: MutationRecord): boolean {
   if (!zone || typeof zone.getAttribute !== 'function') return false;
   if (zone.getAttribute(INTERNAL_ATTR) === 'all') return true;
   return record.type === 'attributes' && record.attributeName === 'style';
+}
+
+/**
+ * True for the `data-ngs-light` attribute flips the library writes when a
+ * surface changes mode. These pass the internal filter (a stacked element
+ * really may need to re-read them) but their probe is deferred until the
+ * tint transition settles, so the probe never samples the intermediate
+ * colour.
+ */
+export function isLightFlipMutation(record: MutationRecord): boolean {
+  return record.type === 'attributes' && record.attributeName === 'data-ngs-light';
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,6 +176,7 @@ const entries = new Map<ProbeTarget, TargetEntry>();
 const activeScrollers = new Set<unknown>();
 let listening = false;
 let rafId = 0;
+let lightSettleTimer = 0;
 let mutationObserver: MutationObserver | null = null;
 let unsubscribeImages: (() => void) | null = null;
 
@@ -185,6 +211,10 @@ function stopListening(): void {
     cancelAnimationFrame(rafId);
     rafId = 0;
   }
+  if (lightSettleTimer) {
+    window.clearTimeout(lightSettleTimer);
+    lightSettleTimer = 0;
+  }
   activeScrollers.clear();
 }
 
@@ -204,7 +234,22 @@ function onGenericTrigger(): void {
 
 function onMutations(records: MutationRecord[]): void {
   if (records.every(isInternalMutation)) return;
+  // Light/Dark flips animate the tint: wait for the transition to settle so
+  // probes read the final colour instead of the intermediate one.
+  if (records.some(isLightFlipMutation)) {
+    scheduleSettledTrigger();
+    return;
+  }
   onGenericTrigger();
+}
+
+function scheduleSettledTrigger(): void {
+  if (typeof window === 'undefined') return;
+  if (lightSettleTimer) window.clearTimeout(lightSettleTimer);
+  lightSettleTimer = window.setTimeout(() => {
+    lightSettleTimer = 0;
+    onGenericTrigger();
+  }, LIGHT_SETTLE_MS);
 }
 
 function scheduleBatch(): void {
@@ -289,11 +334,18 @@ function rectOf(el: HTMLElement): ScrollRect {
   return { top: box.top, left: box.left, width: box.width, height: box.height };
 }
 
+/** Probe rect: the group's region when provided, else the element's box. */
+function targetRect(entry: TargetEntry): ScrollRect | null {
+  if (entry.target.region) return entry.target.region();
+  const el = entry.target.el;
+  if (!el || !el.isConnected) return null;
+  return rectOf(el);
+}
+
 function decideScroll(entry: TargetEntry): void {
   entry.scrollPending = false;
-  const el = entry.target.el;
-  if (!el || !el.isConnected) return;
-  const rect = rectOf(el);
+  const rect = targetRect(entry);
+  if (!rect) return;
   const offsets = mergeOffsets(entry.lastCheck, scrollerOffsets());
   const last = entry.lastCheck;
   entry.lastCheck = { rect, offsets };
@@ -311,12 +363,12 @@ function decideScroll(entry: TargetEntry): void {
 }
 
 function refreshCheck(entry: TargetEntry): void {
-  const el = entry.target.el;
-  if (!el || !el.isConnected) {
+  const rect = targetRect(entry);
+  if (!rect) {
     entry.lastCheck = null;
     return;
   }
-  entry.lastCheck = { rect: rectOf(el), offsets: mergeOffsets(entry.lastCheck, scrollerOffsets()) };
+  entry.lastCheck = { rect, offsets: mergeOffsets(entry.lastCheck, scrollerOffsets()) };
 }
 
 /** Subscribes a probe target; schedules its first probe immediately. */

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { GlassButton, GlassSurface, GlassTabBar } from 'nico-glass-kit';
+import { GlassButton, GlassLightGroup, GlassSurface, GlassTabBar } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
 import { WeiboFeed } from './WeiboFeed';
@@ -20,8 +20,8 @@ interface FeedSource {
   url?: string;
 }
 
-/** 首个源为自写 DOM 信息流（不透明内容可被逐元素探测，明暗随帖子内容实时翻转）；
- *  其余为公网可嵌入信息流源（响应头已实测）。
+/** 首个源为自写 DOM 信息流（不透明内容可被区域探测；其上的顶/底栏各自绑为识别组，
+ *  整组按成员覆盖区域的平均亮度统一翻转，不再逐片乱闪）；其余为公网可嵌入信息流源（响应头已实测）。
  *  被拦截禁用：news.ycombinator.com (XFO DENY) · lite.cnn.com / arxiv.org (frame-ancestors 'none')。
  *  备选池：https://en.m.wikipedia.org/wiki/Wikipedia:Featured_articles */
 const FEEDS: FeedSource[] = [
@@ -105,51 +105,56 @@ export function BarsDemo({ params }: { params: DemoParams }) {
               ) : null,
             )}
             <div className="feed-topbar">
-              <GlassButton
-                variant="icon"
-                size="sm"
-                icon={<ChevronLeftIcon />}
-                aria-label="返回"
-                {...glass}
-              />
-              <GlassSurface cornerRadius={999} className="feed-clock" {...glass}>
-                <span className="feed-clock-primary">今天</span>
-                <span className="feed-clock-secondary">{formatClock(now)}</span>
-              </GlassSurface>
-              <GlassButton
-                variant="icon"
-                size="sm"
-                icon={<EllipsisIcon />}
-                aria-label="更多"
-                {...glass}
-              />
+              <GlassLightGroup>
+                <GlassButton
+                  variant="icon"
+                  size="sm"
+                  icon={<ChevronLeftIcon />}
+                  aria-label="返回"
+                  {...glass}
+                />
+                <GlassSurface cornerRadius={999} className="feed-clock" {...glass}>
+                  <span className="feed-clock-primary">今天</span>
+                  <span className="feed-clock-secondary">{formatClock(now)}</span>
+                </GlassSurface>
+                <GlassButton
+                  variant="icon"
+                  size="sm"
+                  icon={<EllipsisIcon />}
+                  aria-label="更多"
+                  {...glass}
+                />
+              </GlassLightGroup>
             </div>
-            {/* 底部信息源切换：GlassTabBar 留最底（label 用 nbsp 占位、不可见）；
-                上面各自独立叠 4 个真 GlassButton（分图层，无包裹容器），逐片压在
-                四颗槽位上：悬停按钮 = 按钮自身滤镜亮度 +0.5，点击切源。
-                GlassTabBar 组件零改动。 */}
-            <GlassTabBar
-              items={FEEDS.map(({ key }) => ({ key, label: '\u00A0' }))}
-              activeKey={active}
-              onChange={selectFeed}
-              style={{ position: 'absolute', bottom: 14 }}
-              {...glass}
-            />
-            {FEEDS.map((feed, i) => (
-              <GlassButton
-                key={feed.key}
-                size="sm"
-                className="feed-tab-btn"
-                icon={feed.icon}
-                style={{ left: `calc(50% - 177.5px + ${i * 90}px)` }}
-                aria-pressed={feed.key === active}
-                aria-label={`切换到 ${feed.label}`}
-                onClick={() => selectFeed(feed.key)}
+            {/* 底部信息源切换：整条底栏（GlassTabBar + 4 个真按钮）绑成一个识别组，
+                共享一次区域探测，信息源切换/滚动时整条一起翻明暗，不再逐片乱闪。
+                TabBar 仍留最底（label 用 nbsp 占位、不可见），上面各自独立叠 4 个真
+                GlassButton（分图层，无包裹容器）：悬停按钮 = 按钮自身滤镜亮度 +0.5，
+                点击切源。GlassTabBar 组件零改动。 */}
+            <GlassLightGroup>
+              <GlassTabBar
+                items={FEEDS.map(({ key }) => ({ key, label: '\u00A0' }))}
+                activeKey={active}
+                onChange={selectFeed}
+                style={{ position: 'absolute', bottom: 14 }}
                 {...glass}
-              >
-                {feed.label}
-              </GlassButton>
-            ))}
+              />
+              {FEEDS.map((feed, i) => (
+                <GlassButton
+                  key={feed.key}
+                  size="sm"
+                  className="feed-tab-btn"
+                  icon={feed.icon}
+                  style={{ left: `calc(50% - 177.5px + ${i * 90}px)` }}
+                  aria-pressed={feed.key === active}
+                  aria-label={`切换到 ${feed.label}`}
+                  onClick={() => selectFeed(feed.key)}
+                  {...glass}
+                >
+                  {feed.label}
+                </GlassButton>
+              ))}
+            </GlassLightGroup>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  aggregateLuminance,
   compositeOver,
   decideLight,
   firstImageLayer,
@@ -9,6 +10,7 @@ import {
   parseGradient,
   relativeLuminance,
   resolvePointColor,
+  unionRect,
   type PaintLayer,
 } from './backdropProbe';
 
@@ -296,5 +298,40 @@ describe('resolvePointColor', () => {
     );
     expect(out.r).toBeCloseTo(127.5, 5);
     expect(out.a).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Group aggregation                                                   */
+/* ------------------------------------------------------------------ */
+
+describe('aggregateLuminance', () => {
+  it('weights samples by area', () => {
+    expect(
+      aggregateLuminance([
+        { luminance: 0, weight: 1 },
+        { luminance: 1, weight: 3 },
+      ]),
+    ).toBeCloseTo(0.75, 10);
+  });
+
+  it('ignores non-positive weights and nulls an empty result', () => {
+    expect(aggregateLuminance([{ luminance: 1, weight: 0 }])).toBeNull();
+    expect(aggregateLuminance([])).toBeNull();
+  });
+});
+
+describe('unionRect', () => {
+  it('returns the bounding box of the rects', () => {
+    expect(
+      unionRect([
+        { top: 10, left: 20, width: 30, height: 40 },
+        { top: 50, left: 5, width: 10, height: 10 },
+      ]),
+    ).toEqual({ top: 10, left: 5, width: 45, height: 50 });
+  });
+
+  it('returns null for an empty list', () => {
+    expect(unionRect([])).toBeNull();
   });
 });

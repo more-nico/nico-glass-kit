@@ -2,8 +2,29 @@
 
 ## Unreleased
 
+### Added
+
+- `GlassLightGroup`: binds several `overLight='auto'` glass elements into one
+  recognition group. The group samples the area its members cover (each member
+  probed with all member subtrees excluded, per-member means combined by
+  viewport-visible area) and applies a single Light/Dark decision to every
+  member, so stacked/adjacent surfaces can no longer flicker against each
+  other. A new decision must hold for 200 ms on top of the existing luminance
+  hysteresis before it commits. Renders no DOM; explicit
+  `overLight={true|false}` still wins and opts an element out of the group.
+
 ### Changed
 
+- Light/Dark flips now fade over `--ngs-transition` (240 ms) instead of
+  snapping: `color` and `box-shadow` on `.ngs-surface`, `box-shadow` on
+  `.ngs-highlight`, and `background-color` (tint) on `.ngs-effect`. Because the
+  tint is a probed property, mutation-triggered probes are deferred ~260 ms
+  after a `data-ngs-light` flip so no element samples the mid-transition
+  colour (the lock-up documented for the playground tab pill); scroll/resize
+  triggers are unaffected. The `::before` rim gradient does not interpolate
+  and may still change instantly.
+- The playground device frame (`BarsDemo`) wraps the floating top bar and the
+  bottom tab bar in a `GlassLightGroup` each.
 - `GlassButton`'s hover tint is ~70 % lighter: `--ngs-tint-hover` drops from
   `rgba(255, 255, 255, 0.18)` to `rgba(255, 255, 255, 0.05)` over dark
   backdrops. Over light backdrops it now darkens instead of washing out —

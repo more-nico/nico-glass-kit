@@ -153,6 +153,50 @@ export function decideLight(luminance: number, previous: boolean | null): boolea
 }
 
 /* ------------------------------------------------------------------ */
+/* Group aggregation (pure)                                            */
+/* ------------------------------------------------------------------ */
+
+export interface VisibleRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Area-weighted mean of per-member luminance samples. Members with no weight
+ * (fully offscreen) are ignored; returns null when nothing carried weight.
+ */
+export function aggregateLuminance(
+  samples: ReadonlyArray<{ luminance: number; weight: number }>,
+): number | null {
+  let sum = 0;
+  let weightSum = 0;
+  for (const sample of samples) {
+    if (!(sample.weight > 0)) continue;
+    sum += sample.luminance * sample.weight;
+    weightSum += sample.weight;
+  }
+  return weightSum > 0 ? sum / weightSum : null;
+}
+
+/** Bounding union of rects; null for an empty list. */
+export function unionRect(rects: readonly VisibleRect[]): VisibleRect | null {
+  if (!rects.length) return null;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const rect of rects) {
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.left + rect.width);
+    bottom = Math.max(bottom, rect.top + rect.height);
+  }
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+/* ------------------------------------------------------------------ */
 /* Gradients (pure)                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -543,6 +587,150 @@ function paintInfoFor(node: Element, cs: CSSStyleDeclaration): NodePaintInfo {
   return info;
 }
 
+/* ---------------------- probe run helpers --------------------------- */
+
+/** Mutable state shared by every sample point of one probe. */
+interface ProbeRun {
+  doc: Document;
+  win: Window;
+  fallback: Rgba;
+  styles: Map<Element, CSSStyleDeclaration>;
+  rects: Map<Element, DOMRect>;
+  pendingImages: boolean;
+}
+
+function createProbeRun(doc: Document, win: Window): ProbeRun {
+  return {
+    doc,
+    win,
+    fallback: pageFallbackColor(doc),
+    styles: new Map(),
+    rects: new Map(),
+    pendingImages: false,
+  };
+}
+
+function buildLayer(
+  run: ProbeRun,
+  node: Element,
+  cs: CSSStyleDeclaration,
+  nodeRect: DOMRect,
+  point: Point,
+): PaintLayer {
+  // The background-image analysis is served from the per-node paint cache:
+  // reading `cs.backgroundImage` materialises the whole value (data URLs
+  // can be megabytes) and firstImageLayer/extractUrl walk it, so doing
+  // that per sample point would dominate every probe.
+  const info = paintInfoFor(node, cs);
+  let imageColor: Rgba | null = null;
+  if (info.image && info.image.kind === 'url') {
+    // The cached FirstImage holds the exact URL string object, so this
+    // lookup is an identity hit instead of re-hashing megabytes per point.
+    const state = requestImage(info.image.url);
+    if (state === 'pending') {
+      run.pendingImages = true;
+    } else if (state !== 'failed') {
+      // Precise pixel only for the cover+center case the playground and
+      // most full-bleed backgrounds use; otherwise the whole-image average.
+      const precise =
+        info.size === 'cover' &&
+        (info.position === 'center' ||
+          info.position.includes('center') ||
+          info.position.includes('50%'));
+      imageColor = precise
+        ? sampleImagePixel(state.img, { width: nodeRect.width, height: nodeRect.height }, point) ??
+          state.average
+        : state.average;
+    }
+  }
+  return {
+    box: { width: nodeRect.width, height: nodeRect.height },
+    point,
+    backgroundColor: parseCssColor(cs.backgroundColor),
+    gradient: info.gradient,
+    imageColor,
+  };
+}
+
+/**
+ * Turns the nodes behind a sample point into paint layers, or null when an
+ * unreadable opaque layer (iframe/media/canvas) hides everything below it.
+ */
+function gatherLayers(
+  run: ProbeRun,
+  behind: readonly Element[],
+  isExcluded: (node: Element) => boolean,
+  point: Point,
+): PaintLayer[] | null {
+  const layers: PaintLayer[] = [];
+  for (const node of behind) {
+    if (isExcluded(node)) continue;
+    if (UNKNOWN_CONTENT_TAGS.has(node.tagName)) {
+      // Opaque content we cannot read: anything behind it is hidden, so
+      // the sample point says nothing usable — drop it.
+      return null;
+    }
+    let cs = run.styles.get(node);
+    if (!cs) {
+      cs = run.win.getComputedStyle(node);
+      run.styles.set(node, cs);
+    }
+    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+    let nodeRect = run.rects.get(node);
+    if (!nodeRect) {
+      nodeRect = node.getBoundingClientRect();
+      run.rects.set(node, nodeRect);
+    }
+    layers.push(
+      buildLayer(run, node, cs, nodeRect, {
+        x: point.x - nodeRect.left,
+        y: point.y - nodeRect.top,
+      }),
+    );
+    if (layers.length >= MAX_LAYERS_PER_POINT) break;
+  }
+  return layers;
+}
+
+/** Runs the 3×3 interior grid over `rect`, keeping only usable points. */
+function probeGrid(
+  run: ProbeRun,
+  rect: { left: number; top: number; width: number; height: number },
+  resolveLayers: (stack: Element[], x: number, y: number) => PaintLayer[] | null,
+): number[] {
+  const { win } = run;
+  const luminances: number[] = [];
+  for (const fx of GRID_FRACTIONS) {
+    for (const fy of GRID_FRACTIONS) {
+      const x = Math.min(Math.max(rect.left + rect.width * fx, 0), win.innerWidth - 1);
+      const y = Math.min(Math.max(rect.top + rect.height * fy, 0), win.innerHeight - 1);
+      const stack = run.doc.elementsFromPoint(x, y);
+      const layers = resolveLayers(stack, x, y);
+      if (!layers) continue;
+      luminances.push(relativeLuminance(resolvePointColor(layers, run.fallback)));
+    }
+  }
+  return luminances;
+}
+
+function mean(values: readonly number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function isWithinMembers(node: Element, members: readonly HTMLElement[]): boolean {
+  for (const member of members) {
+    if (node === member || member.contains(node)) return true;
+  }
+  return false;
+}
+
+/** Viewport-clipped area of a member rect; 0 when fully offscreen. */
+function visibleRectArea(rect: DOMRect, win: Window): number {
+  const width = Math.min(rect.right, win.innerWidth) - Math.max(rect.left, 0);
+  const height = Math.min(rect.bottom, win.innerHeight) - Math.max(rect.top, 0);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+
 export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
   const doc = el.ownerDocument;
   const win = doc.defaultView;
@@ -556,95 +744,66 @@ export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
     rect.left >= win.innerWidth;
   if (offscreen) return null;
 
-  const fallback = pageFallbackColor(doc);
-  const styles = new Map<Element, CSSStyleDeclaration>();
-  const rects = new Map<Element, DOMRect>();
-  let pendingImages = false;
-  const luminances: number[] = [];
-
-  const makeLayer = (node: Element, cs: CSSStyleDeclaration, nodeRect: DOMRect, point: Point): PaintLayer => {
-    // The background-image analysis is served from the per-node paint cache:
-    // reading `cs.backgroundImage` materialises the whole value (data URLs
-    // can be megabytes) and firstImageLayer/extractUrl walk it, so doing
-    // that per sample point would dominate every probe.
-    const info = paintInfoFor(node, cs);
-    let imageColor: Rgba | null = null;
-    if (info.image && info.image.kind === 'url') {
-      // The cached FirstImage holds the exact URL string object, so this
-      // lookup is an identity hit instead of re-hashing megabytes per point.
-      const state = requestImage(info.image.url);
-      if (state === 'pending') {
-        pendingImages = true;
-      } else if (state !== 'failed') {
-        // Precise pixel only for the cover+center case the playground and
-        // most full-bleed backgrounds use; otherwise the whole-image average.
-        const precise =
-          info.size === 'cover' &&
-          (info.position === 'center' ||
-            info.position.includes('center') ||
-            info.position.includes('50%'));
-        imageColor = precise
-          ? sampleImagePixel(state.img, { width: nodeRect.width, height: nodeRect.height }, point) ??
-            state.average
-          : state.average;
-      }
-    }
-    return {
-      box: { width: nodeRect.width, height: nodeRect.height },
-      point,
-      backgroundColor: parseCssColor(cs.backgroundColor),
-      gradient: info.gradient,
-      imageColor,
-    };
-  };
-
-  for (const fx of GRID_FRACTIONS) {
-    for (const fy of GRID_FRACTIONS) {
-      const x = Math.min(Math.max(rect.left + rect.width * fx, 0), win.innerWidth - 1);
-      const y = Math.min(Math.max(rect.top + rect.height * fy, 0), win.innerHeight - 1);
-      const stack = doc.elementsFromPoint(x, y);
-      const self = stack.indexOf(el);
-      const behind =
-        self >= 0
-          ? stack.slice(self + 1)
-          : stack.filter((node) => node !== el && !el.contains(node));
-      const layers: PaintLayer[] = [];
-      let pointKnown = true;
-      for (const node of behind) {
-        if (el.contains(node)) continue;
-        if (UNKNOWN_CONTENT_TAGS.has(node.tagName)) {
-          // Opaque content we cannot read: anything behind it is hidden, so
-          // the sample point says nothing usable — drop it.
-          pointKnown = false;
-          break;
-        }
-        let cs = styles.get(node);
-        if (!cs) {
-          cs = win.getComputedStyle(node);
-          styles.set(node, cs);
-        }
-        if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-        let nodeRect = rects.get(node);
-        if (!nodeRect) {
-          nodeRect = node.getBoundingClientRect();
-          rects.set(node, nodeRect);
-        }
-        layers.push(makeLayer(node, cs, nodeRect, { x: x - nodeRect.left, y: y - nodeRect.top }));
-        if (layers.length >= MAX_LAYERS_PER_POINT) break;
-      }
-      if (!pointKnown) continue;
-      luminances.push(relativeLuminance(resolvePointColor(layers, fallback)));
-    }
-  }
+  const run = createProbeRun(doc, win);
+  const luminances = probeGrid(run, rect, (stack, x, y) => {
+    const self = stack.indexOf(el);
+    const behind =
+      self >= 0
+        ? stack.slice(self + 1)
+        : stack.filter((node) => node !== el && !el.contains(node));
+    return gatherLayers(run, behind, (node) => el.contains(node), { x, y });
+  });
 
   // Empty grid = every point landed on unknowable opaque content (or the
   // element was clamped out of any readable paint) — signal "unreadable"
   // rather than an empty average.
-  if (!luminances.length) return { averageLuminance: null, pendingImages };
-  return {
-    averageLuminance: luminances.reduce((sum, l) => sum + l, 0) / luminances.length,
-    pendingImages,
-  };
+  if (!luminances.length) return { averageLuminance: null, pendingImages: run.pendingImages };
+  return { averageLuminance: mean(luminances), pendingImages: run.pendingImages };
+}
+
+/**
+ * Samples the backdrop under a whole group of glass members.
+ *
+ * A sample point only counts when it lands on some member. Every member
+ * layer (and its subtree) is skipped, so the group reads the page behind it
+ * instead of another member's tint — a button stacked on the tab bar cannot
+ * feed its own backdrop back into the group. Per-member means are combined
+ * by viewport-visible area, so a sparse group (top bar + bottom bar) still
+ * resolves. Returns null when no member is currently measurable (offscreen),
+ * so the caller keeps its last decision.
+ */
+export function probeMembersBackdropLight(
+  members: readonly HTMLElement[],
+): BackdropProbe | null {
+  const connected = members.filter((member) => member.isConnected);
+  if (!connected.length) return null;
+  const doc = connected[0].ownerDocument;
+  const win = doc.defaultView;
+  if (!win || typeof doc.elementsFromPoint !== 'function') return null;
+
+  const run = createProbeRun(doc, win);
+  const isMemberNode = (node: Element) => isWithinMembers(node, connected);
+  const samples: { luminance: number; weight: number }[] = [];
+  let measurable = false;
+
+  for (const member of connected) {
+    const rect = member.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) continue;
+    const weight = visibleRectArea(rect, win);
+    if (weight <= 0) continue;
+    measurable = true;
+    const luminances = probeGrid(run, rect, (stack, x, y) => {
+      const boundary = stack.findIndex((node) => isMemberNode(node));
+      if (boundary < 0) return null; // point not covered by the group
+      return gatherLayers(run, stack.slice(boundary + 1), isMemberNode, { x, y });
+    });
+    if (!luminances.length) continue;
+    samples.push({ luminance: mean(luminances), weight });
+  }
+
+  if (!measurable) return null; // every member offscreen/zero-size: keep last
+  if (!samples.length) return { averageLuminance: null, pendingImages: run.pendingImages };
+  return { averageLuminance: aggregateLuminance(samples), pendingImages: run.pendingImages };
 }
 
 function pageFallbackColor(doc: Document): Rgba {

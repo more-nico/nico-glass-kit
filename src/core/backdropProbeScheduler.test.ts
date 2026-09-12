@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decideScrollProbe, isInternalMutation } from './backdropProbeScheduler';
+import { decideScrollProbe, isInternalMutation, isLightFlipMutation } from './backdropProbeScheduler';
 
 /* ------------------------------------------------------------------ */
 /* isInternalMutation                                                  */
@@ -51,6 +51,24 @@ describe('isInternalMutation', () => {
     expect(isInternalMutation(mutation('attributes', el, 'style'))).toBe(false);
     expect(isInternalMutation(mutation('attributes', el, 'class'))).toBe(false);
     expect(isInternalMutation(mutation('childList', el))).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* isLightFlipMutation                                                 */
+/* ------------------------------------------------------------------ */
+
+describe('isLightFlipMutation', () => {
+  it('matches the data-ngs-light attribute flip', () => {
+    const el = fakeElement({ zone: null });
+    expect(isLightFlipMutation(mutation('attributes', el, 'data-ngs-light'))).toBe(true);
+  });
+
+  it('ignores other attributes and childList changes', () => {
+    const el = fakeElement({ zone: null });
+    expect(isLightFlipMutation(mutation('attributes', el, 'style'))).toBe(false);
+    expect(isLightFlipMutation(mutation('attributes', el, 'class'))).toBe(false);
+    expect(isLightFlipMutation(mutation('childList', el))).toBe(false);
   });
 });
 

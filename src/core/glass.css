@@ -8,6 +8,12 @@
   color: var(--ngs-text);
   box-shadow: var(--ngs-shadow-sm);
   -webkit-tap-highlight-color: transparent;
+  /* Light/Dark token flips fade instead of snapping. Only properties the
+     backdrop probe does not read are transitioned; the tint lives on
+     .ngs-effect and is deferred by the probe scheduler after a flip. */
+  transition:
+    color var(--ngs-transition),
+    box-shadow var(--ngs-transition);
 }
 
 /*
@@ -42,7 +48,9 @@
     var(--ngs-glass-tint) calc(var(--ngs-glass-tint-strength) * 100%),
     transparent
   );
-  transition: opacity var(--ngs-transition);
+  transition:
+    opacity var(--ngs-transition),
+    background-color var(--ngs-transition);
 }
 
 /* No backdrop-filter at all: fall back to a mostly opaque fill. */
@@ -73,6 +81,7 @@
   box-shadow:
     inset 0 1px 0 var(--ngs-rim-top-soft),
     inset 0 -1px 0 var(--ngs-rim-bottom);
+  transition: box-shadow var(--ngs-transition);
 }
 
 .ngs-highlight::before {

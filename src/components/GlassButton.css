@@ -6,7 +6,10 @@
   font: inherit;
   cursor: pointer;
   user-select: none;
-  transition: transform var(--ngs-transition-fast);
+  transition:
+    transform var(--ngs-transition-fast),
+    color var(--ngs-transition),
+    box-shadow var(--ngs-transition);
 }
 
 .ngs-btn:disabled {

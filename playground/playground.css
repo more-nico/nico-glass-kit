@@ -897,12 +897,9 @@ code {
   min-width: 85px;
   height: 64px;
   padding: 0 19px;
-  /* 槽位底衬的激活胶囊不做 background-color 过渡：过渡中的中间色会被逐元素
-     探测采样（首次重算仍返回旧 token 的 0.66 浅色），使压在其上的信息源按钮
-     在底栏翻暗后锁死为浅色。颜色即时切换后探测与绘制始终一致。 */
-  transition:
-    color var(--ngs-transition-fast),
-    transform var(--ngs-transition-fast);
+  /* 底栏已绑为识别组：激活胶囊与压在其上的按钮同属一组，组探测排除全部成员
+     子树，因此胶囊的 background-color 过渡不会再被按钮采到中间色，可安全沿用
+     组件默认过渡（明暗变化渐变，不再瞬时跳变）。 */
 }
 
 .phone-frame .ngs-tab-label {
@@ -911,18 +908,15 @@ code {
 }
 
 /* 选中槽位底衬胶囊与玻璃底反向取色：浅色玻璃底 → 深色胶囊（深色底 → 组件默认浅色
-   胶囊，无需覆盖）。胶囊夹在 TabBar 玻璃面与其上的信息源 GlassButton 之间，按钮的
-   逐元素 overLight 探测会读到胶囊颜色并自动翻转图标/文字；调度器放行 data-ngs-light
-   翻转，因此不需要 JS。
-   不要给 background 加 transition：过渡中间色会被探测采样，导致按钮模式锁死
-   （见 .phone-frame .ngs-tab 的过渡注释）。 */
+   胶囊，无需覆盖）。底栏整体是一个识别组，激活按钮不再逐片探测胶囊，胶囊自身的
+   background 过渡也不会造成模式锁死；反色由组的 data-ngs-light 驱动，组内一起渐变。 */
 .phone-frame .ngs-tabbar[data-ngs-light='true'] .ngs-tab--active {
   background: rgba(0, 0, 0, 0.3);
 }
 
-/* 激活按钮内容钉成浅色：强制 overLight={true} 时按钮自身不会随胶囊翻色，且自动模式
-   探测有 ~120ms 节流窗口；显式覆盖保证深色胶囊上恒定可读（自动模式下按钮本就会探测
-   成白色，此规则结果一致、无副作用）。 */
+/* 激活按钮内容钉成浅色：组模式为浅色时胶囊被反色成深色，按钮此时不再自己探测
+   胶囊（组成员共享组结果），显式覆盖保证深色胶囊上恒定可读；深色组模式走组件
+   默认的浅色文字，无需覆盖。 */
 .phone-frame .ngs-tabbar[data-ngs-light='true'] ~ .feed-tab-btn[aria-pressed='true'] {
   --ngs-text: rgba(255, 255, 255, 0.7);
 }
