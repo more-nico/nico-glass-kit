@@ -89,6 +89,11 @@
 
 ### Changed
 
+- `package.json` metadata: the description now reads "Apple-style glass
+  (iOS 26) React component kit with tiered rendering" — the wording from
+  before the rename is gone, so the npm listing matches the Nico Glass brand —
+  and a new `repository` field points at
+  `github.com/more-nico/nico-glass-kit`. No source or CSS changes.
 - Light/Dark flips now fade over `--ngs-transition` (240 ms) instead of
   snapping: `color` and `box-shadow` on `.ngs-surface`, `box-shadow` on
   `.ngs-highlight`, and `background-color` (tint) on `.ngs-effect`. Because the

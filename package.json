@@ -1,9 +1,13 @@
 {
   "name": "nico-glass-kit",
   "version": "0.3.0",
-  "description": "Apple-style Liquid Glass (iOS 26) React component kit with tiered rendering",
+  "description": "Apple-style glass (iOS 26) React component kit with tiered rendering",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/more-nico/nico-glass-kit.git"
+  },
   "main": "./dist/nico-glass-kit.cjs",
   "module": "./dist/nico-glass-kit.mjs",
   "types": "./dist/index.d.ts",
