@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GlassCheckbox, GlassLightGroup, GlassSwitch } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
 export function SelectionDemo({ params }: { params: DemoParams }) {
@@ -13,14 +14,12 @@ export function SelectionDemo({ params }: { params: DemoParams }) {
     setChecks((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">06</span>
-        <div className="demo-head-text">
-          <h3>GlassSwitch & GlassCheckbox</h3>
-          <p>开关与勾选框：受控组件，键盘可聚焦，勾选态在玻璃内淡入</p>
-        </div>
-      </header>
+    <DemoSection
+      index="06"
+      title="GlassSwitch & GlassCheckbox"
+      description="开关与勾选框：受控组件，键盘可聚焦，勾选态在玻璃内淡入"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">开关 Switch</span>
@@ -83,6 +82,6 @@ export function SelectionDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

@@ -30,7 +30,7 @@ export function BackgroundScene({ id, customUrl }: Props) {
         <div className="bg-text-wall">
           {Array.from({ length: 30 }, (_, i) => (
             <p key={i} className={i % 3 === 1 ? 'dim' : i % 3 === 2 ? 'dimmer' : ''}>
-              Liquid Glass 液态玻璃 Refraction 折射 Squircle Snell nico-glass-kit
+              Nico Glass 液态玻璃 Refraction 折射 Squircle Snell nico-glass-kit
               Displacement 位移 Rim Light 边缘高光&nbsp;
             </p>
           ))}

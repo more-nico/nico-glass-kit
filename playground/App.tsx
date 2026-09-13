@@ -2,12 +2,17 @@ import { useState } from 'react';
 import {
   DEFAULT_LENS_MAP_RASTER_SCALE,
   DEFAULT_OPTICS,
+  GlassBadge,
+  GlassLightGroup,
+  GlassNavBar,
   GlassPill,
   GlassProvider,
+  GlassSurface,
   type GlassOptics,
   type GlassQuality,
   type OverLight,
 } from 'nico-glass-kit';
+import { glassProps } from './demos/demoProps';
 import { ControlPanel } from './ControlPanel';
 import { FpsMeter } from './FpsMeter';
 import { BackgroundScene, type BackgroundId } from './demos/BackgroundScene';
@@ -61,11 +66,23 @@ export default function App() {
       <BackgroundScene id={params.background} customUrl={customBg} />
 
       <header className="pg-header">
-        <div className="pg-brand">
-          <span className="pg-logo" aria-hidden="true" />
-          <span>nico-glass-kit</span>
-        </div>
-        <span className="pg-badge">Liquid Glass · iOS 26</span>
+        <GlassLightGroup>
+          <GlassNavBar
+            className="pg-navbar"
+            leading={
+              <span className="pg-brand">
+                <span className="pg-logo" aria-hidden="true" />
+                <span>nico-glass-kit</span>
+              </span>
+            }
+            trailing={
+              <GlassBadge size="sm" {...glassProps(params)}>
+                Nico Glass
+              </GlassBadge>
+            }
+            {...glassProps(params)}
+          />
+        </GlassLightGroup>
       </header>
 
       <main className="pg-main">
@@ -82,10 +99,12 @@ export default function App() {
           <ProgressDemo params={params} />
           <OverlayDemo params={params} />
         </div>
-        <footer className="pg-footer">
-          nico-glass-kit · Low / Medium / High 三档渲染 · Chromium 折射，
-          其余浏览器自动降级
-        </footer>
+        <GlassSurface as="footer" className="pg-footer" {...glassProps(params)}>
+          <p className="pg-footer-text">
+            nico-glass-kit · Low / Medium / High 三档渲染 · Chromium 折射，
+            其余浏览器自动降级
+          </p>
+        </GlassSurface>
       </main>
 
       <ControlPanel params={params} onChange={setParams} onUploadBg={setCustomBg} customBg={customBg} />

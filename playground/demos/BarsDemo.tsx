@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { GlassButton, GlassLightGroup, GlassSurface, GlassTabBar } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { WeiboFeed } from './WeiboFeed';
 import {
@@ -65,14 +66,12 @@ export function BarsDemo({ params }: { params: DemoParams }) {
   const glass = glassProps(params);
 
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">03</span>
-        <div className="demo-head-text">
-          <h3>悬浮顶栏 · 实时信息流</h3>
-          <p>iOS 26 三件式悬浮玻璃顶栏，内嵌 DOM 信息流与公网页面真实滚动</p>
-        </div>
-      </header>
+    <DemoSection
+      index="03"
+      title="悬浮顶栏 · 实时信息流"
+      description="iOS 26 三件式悬浮玻璃顶栏，内嵌 DOM 信息流与公网页面真实滚动"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">设备框 Device</span>
@@ -158,6 +157,6 @@ export function BarsDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

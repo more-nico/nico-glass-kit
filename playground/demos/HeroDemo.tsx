@@ -27,7 +27,7 @@ export function HeroDemo({ params, onShowPill }: Props) {
           {...glassProps(params)}
         >
           <div className="hero-glass-inner">
-            <span className="hero-title">Liquid Glass</span>
+            <span className="hero-title">Nico Glass</span>
             <span className="hero-sub">拖动我 · Drag me · 观察边缘折射与高光</span>
           </div>
         </GlassSurface>

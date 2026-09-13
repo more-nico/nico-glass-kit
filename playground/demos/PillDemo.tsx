@@ -1,5 +1,6 @@
 import { GlassButton, GlassLightGroup, GlassPill } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { BellIcon } from './icons';
 
@@ -10,14 +11,12 @@ interface Props {
 
 export function PillDemo({ params, onShowPill }: Props) {
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">04</span>
-        <div className="demo-head-text">
-          <h3>GlassPill</h3>
-          <p>悬浮式信息胶囊，可用作 Toast（带进入/退出动画）</p>
-        </div>
-      </header>
+    <DemoSection
+      index="04"
+      title="GlassPill"
+      description="悬浮式信息胶囊，可用作 Toast（带进入/退出动画）"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">内联预览 Inline</span>
@@ -44,6 +43,6 @@ export function PillDemo({ params, onShowPill }: Props) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

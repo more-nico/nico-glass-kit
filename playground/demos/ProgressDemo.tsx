@@ -1,17 +1,16 @@
 import { GlassLightGroup, GlassProgress, GlassSpinner } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
 export function ProgressDemo({ params }: { params: DemoParams }) {
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">09</span>
-        <div className="demo-head-text">
-          <h3>GlassProgress & GlassSpinner</h3>
-          <p>进度条与加载环：轨道、填充与圆点使用同一套控件 token</p>
-        </div>
-      </header>
+    <DemoSection
+      index="09"
+      title="GlassProgress & GlassSpinner"
+      description="进度条与加载环：轨道、填充与圆点使用同一套控件 token"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">进度 Progress</span>
@@ -49,6 +48,6 @@ export function ProgressDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

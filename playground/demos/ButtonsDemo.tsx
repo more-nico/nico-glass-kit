@@ -1,18 +1,17 @@
 import { GlassButton, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { ChevronLeftIcon, EllipsisIcon, PlusIcon } from './icons';
 
 export function ButtonsDemo({ params }: { params: DemoParams }) {
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">01</span>
-        <div className="demo-head-text">
-          <h3>GlassButton</h3>
-          <p>胶囊按钮与圆形图标按钮，悬停提亮、按压回弹</p>
-        </div>
-      </header>
+    <DemoSection
+      index="01"
+      title="GlassButton"
+      description="胶囊按钮与圆形图标按钮，悬停提亮、按压回弹"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">胶囊 Capsule</span>
@@ -62,6 +61,6 @@ export function ButtonsDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

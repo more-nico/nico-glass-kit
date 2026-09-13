@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GlassLightGroup, GlassSegmentedControl, GlassSlider } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { GridIcon, HouseIcon, ListIcon, SearchIcon } from './icons';
 
@@ -29,14 +30,12 @@ export function ControlsDemo({ params }: { params: DemoParams }) {
   const [tab, setTab] = useState('home');
 
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">07</span>
-        <div className="demo-head-text">
-          <h3>GlassSlider & GlassSegmentedControl</h3>
-          <p>滑杆用原生 range 玻璃化，分段选择器复用底栏的激活胶囊语言</p>
-        </div>
-      </header>
+    <DemoSection
+      index="07"
+      title="GlassSlider & GlassSegmentedControl"
+      description="滑杆用原生 range 玻璃化，分段选择器复用底栏的激活胶囊语言"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">滑杆 Slider</span>
@@ -97,6 +96,6 @@ export function ControlsDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

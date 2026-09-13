@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GlassInput, GlassLightGroup, GlassSelect } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { CloseIcon, InfoIcon, SearchIcon } from './icons';
 
@@ -23,14 +24,12 @@ export function InputsDemo({ params }: { params: DemoParams }) {
   const [size, setSize] = useState('md');
 
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">05</span>
-        <div className="demo-head-text">
-          <h3>GlassInput & GlassSelect</h3>
-          <p>文本输入与下拉选择：图标、前后缀、校验态与禁用态</p>
-        </div>
-      </header>
+    <DemoSection
+      index="05"
+      title="GlassInput & GlassSelect"
+      description="文本输入与下拉选择：图标、前后缀、校验态与禁用态"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">尺寸 Size</span>
@@ -146,6 +145,6 @@ export function InputsDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

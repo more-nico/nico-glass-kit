@@ -4,11 +4,19 @@ import {
   DEFAULT_OPTICS,
   MAX_LENS_MAP_RASTER_SCALE,
   MIN_LENS_MAP_RASTER_SCALE,
+  GlassButton,
+  GlassCard,
+  GlassLightGroup,
+  GlassSegmentedControl,
+  GlassSlider,
+  GlassSurface,
   type GlassOptics,
+  type GlassQuality,
+  type OverLight,
 } from 'nico-glass-kit';
-import { GlassCard, type GlassQuality, type OverLight } from 'nico-glass-kit';
 import type { DemoParams } from './App';
 import { BACKGROUNDS } from './demos/BackgroundScene';
+import { glassProps } from './demos/demoProps';
 
 interface Props {
   params: DemoParams;
@@ -17,17 +25,27 @@ interface Props {
   onUploadBg: (dataUrl: string) => void;
 }
 
-const QUALITY_OPTIONS: { value: GlassQuality; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
+const QUALITY_ITEMS: { key: string; label: string }[] = [
+  { key: 'low', label: 'Low' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'high', label: 'High' },
 ];
 
-const OVERLIGHT_OPTIONS: { value: OverLight; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: true, label: 'Light' },
-  { value: false, label: 'Dark' },
+const OVERLIGHT_ITEMS: { key: string; label: string }[] = [
+  { key: 'auto', label: 'Auto' },
+  { key: 'light', label: 'Light' },
+  { key: 'dark', label: 'Dark' },
 ];
+
+function overLightKey(value: OverLight): string {
+  if (value === 'auto') return 'auto';
+  return value ? 'light' : 'dark';
+}
+
+function overLightFromKey(key: string): OverLight {
+  if (key === 'auto') return 'auto';
+  return key === 'light';
+}
 
 /** Presets are sparse optics layers over DEFAULT_OPTICS (ported from the reference). */
 const PRESETS: { name: string; optics: Partial<GlassOptics> }[] = [
@@ -117,24 +135,27 @@ function Slider(props: {
   value: number;
   format?: (v: number) => string;
   onChange: (v: number) => void;
+  params: DemoParams;
 }) {
   return (
-    <label className="cp-slider">
+    <div className="cp-slider">
       <span className="cp-slider-head">
         <span>{props.label}</span>
         <span className="cp-slider-val">
           {props.format ? props.format(props.value) : props.value}
         </span>
       </span>
-      <input
-        type="range"
+      <GlassSlider
+        className="cp-slider-track"
+        size="sm"
         min={props.min}
         max={props.max}
         step={props.step}
         value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
+        onChange={props.onChange}
+        {...glassProps(props.params)}
       />
-    </label>
+    </div>
   );
 }
 
@@ -172,14 +193,15 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
 
   return (
     <aside className={['cp', !open && 'cp--closed'].filter(Boolean).join(' ')}>
-      <button
-        type="button"
+      <GlassButton
+        variant="icon"
+        size="md"
         className="cp-toggle"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? '收起控制面板' : '展开控制面板'}
-      >
-        {open ? '→' : '←'}
-      </button>
+        icon={<span aria-hidden="true">{open ? '→' : '←'}</span>}
+        {...glassProps(params)}
+      />
       <GlassCard
         className="cp-card"
         padding={18}
@@ -187,86 +209,94 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
         overLight={params.overLight}
         elasticity={0}
       >
-        <h1 className="cp-title">Liquid Glass</h1>
+        <h1 className="cp-title">Nico Glass</h1>
         <p className="cp-subtitle">nico-glass-kit playground</p>
 
         <Group title="渲染 Quality">
-          <div className="cp-seg">
-            {QUALITY_OPTIONS.map((q) => (
-              <button
-                key={q.value}
-                type="button"
-                className={['cp-seg-btn', params.quality === q.value && 'is-active']
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => set('quality', q.value)}
-              >
-                {q.label}
-              </button>
-            ))}
-          </div>
-          <div className="cp-seg" style={{ marginTop: 6 }}>
-            {OVERLIGHT_OPTIONS.map((o) => (
-              <button
-                key={o.label}
-                type="button"
-                className={['cp-seg-btn', params.overLight === o.value && 'is-active']
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => set('overLight', o.value)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          <GlassSegmentedControl
+            className="cp-seg-control"
+            size="sm"
+            items={QUALITY_ITEMS}
+            value={params.quality}
+            onChange={(key) => set('quality', key as GlassQuality)}
+            {...glassProps(params)}
+          />
+          <GlassSegmentedControl
+            className="cp-seg-control cp-seg-control--stack"
+            size="sm"
+            items={OVERLIGHT_ITEMS}
+            value={overLightKey(params.overLight)}
+            onChange={(key) => set('overLight', overLightFromKey(key))}
+            {...glassProps(params)}
+          />
         </Group>
 
         <Group title="背景 Background">
-          <div className="cp-bgs">
-            {BACKGROUNDS.map((b) => (
-              <button
-                key={b.id}
+          <GlassLightGroup>
+            <div className="cp-bgs">
+              {BACKGROUNDS.map((b) => (
+                <GlassSurface
+                  key={b.id}
+                  as="button"
+                  type="button"
+                  cornerRadius={999}
+                  className={['cp-bg-btn', params.background === b.id && 'is-active']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => set('background', b.id)}
+                  aria-label={b.label}
+                  title={b.label}
+                  {...glassProps(params)}
+                >
+                  <span className={`cp-bg-swatch cp-bg-${b.id}`} aria-hidden="true" />
+                </GlassSurface>
+              ))}
+              {customBg && (
+                <GlassSurface
+                  as="button"
+                  type="button"
+                  cornerRadius={999}
+                  className={['cp-bg-btn', params.background === 'custom' && 'is-active']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => set('background', 'custom')}
+                  aria-label="自定义背景"
+                  title="自定义背景"
+                  {...glassProps(params)}
+                >
+                  <span
+                    className="cp-bg-swatch"
+                    style={{ backgroundImage: `url(${customBg})` }}
+                    aria-hidden="true"
+                  />
+                </GlassSurface>
+              )}
+              <GlassSurface
+                as="button"
                 type="button"
-                className={['cp-bg-btn', `cp-bg-${b.id}`, params.background === b.id && 'is-active']
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => set('background', b.id)}
-                aria-label={b.label}
-                title={b.label}
-              />
-            ))}
-            {customBg && (
-              <button
-                type="button"
-                className={['cp-bg-btn', 'cp-bg-image', params.background === 'custom' && 'is-active']
-                  .filter(Boolean)
-                  .join(' ')}
-                style={{ backgroundImage: `url(${customBg})` }}
-                onClick={() => set('background', 'custom')}
-                aria-label="自定义背景"
-                title="自定义背景"
-              />
-            )}
-            <button
-              type="button"
-              className="cp-bg-btn cp-bg-upload"
-              onClick={() => fileRef.current?.click()}
-              aria-label="上传背景图片"
-              title="上传背景图片"
-            >
-              +
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => {
-                onFile(e.target.files?.[0]);
-                e.target.value = '';
-              }}
-            />
-          </div>
+                cornerRadius={999}
+                className="cp-bg-btn cp-bg-upload"
+                onClick={() => fileRef.current?.click()}
+                aria-label="上传背景图片"
+                title="上传背景图片"
+                {...glassProps(params)}
+              >
+                <span className="cp-bg-upload-glyph" aria-hidden="true">
+                  +
+                </span>
+              </GlassSurface>
+            </div>
+          </GlassLightGroup>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              onFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
         </Group>
 
         <Group title="材质 Material">
@@ -278,6 +308,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.blur}
             format={(v) => `${v}px`}
             onChange={(v) => setOptics('blur', v)}
+            params={params}
           />
           <Slider
             label="饱和度 Saturation"
@@ -287,6 +318,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.saturation}
             format={(v) => `${v}%`}
             onChange={(v) => setOptics('saturation', v)}
+            params={params}
           />
           <Slider
             label="亮度 Brightness"
@@ -296,6 +328,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.brightness}
             format={(v) => v.toFixed(2)}
             onChange={(v) => setOptics('brightness', v)}
+            params={params}
           />
           <div className="cp-slider">
             <span className="cp-slider-head">
@@ -310,15 +343,15 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
                 onChange={(e) => setOptics('tint', e.target.value)}
                 aria-label="Tint 颜色"
               />
-              <button
-                type="button"
-                className="cp-mini"
+              <GlassButton
+                size="sm"
                 onClick={() => setOptics('tint', DEFAULT_OPTICS.tint)}
                 disabled={tintIsAuto}
                 title="恢复 light-dark 明暗自适应"
+                {...glassProps(params)}
               >
                 Auto
-              </button>
+              </GlassButton>
             </div>
           </div>
           <Slider
@@ -329,6 +362,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.tintStrength}
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => setOptics('tintStrength', v)}
+            params={params}
           />
         </Group>
 
@@ -341,6 +375,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.mapRasterScale}
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => set('mapRasterScale', v)}
+            params={params}
           />
           <p className="cp-hint">
             折射位移贴图的清晰度：越低，浏览器每帧的准备成本越小、折射边缘越柔和。
@@ -358,6 +393,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.refraction}
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => setOptics('refraction', v)}
+            params={params}
           />
           <Slider
             label="折射带 Depth"
@@ -367,6 +403,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.depth}
             format={(v) => `${v}px`}
             onChange={(v) => setOptics('depth', v)}
+            params={params}
           />
           <Slider
             label="曲率 Curvature"
@@ -376,6 +413,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.curvature}
             format={(v) => v.toFixed(2)}
             onChange={(v) => setOptics('curvature', v)}
+            params={params}
           />
           <Slider
             label="色散 Dispersion"
@@ -385,6 +423,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.optics.dispersion}
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => setOptics('dispersion', v)}
+            params={params}
           />
         </Group>
 
@@ -397,6 +436,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.highlight}
             format={(v) => `${Math.round(v * 100)}%`}
             onChange={(v) => set('highlight', v)}
+            params={params}
           />
           <Slider
             label="弹性 Elasticity"
@@ -405,6 +445,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             step={0.01}
             value={params.elasticity}
             onChange={(v) => set('elasticity', v)}
+            params={params}
           />
         </Group>
 
@@ -417,22 +458,25 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             value={params.cornerRadius}
             format={(v) => `${v}px`}
             onChange={(v) => set('cornerRadius', v)}
+            params={params}
           />
         </Group>
 
         <Group title="预设 Presets">
-          <div className="cp-presets">
-            {PRESETS.map((p) => (
-              <button
-                key={p.name}
-                type="button"
-                className="cp-preset-btn"
-                onClick={() => onChange({ ...params, optics: { ...params.optics, ...p.optics } })}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
+          <GlassLightGroup>
+            <div className="cp-presets">
+              {PRESETS.map((p) => (
+                <GlassButton
+                  key={p.name}
+                  size="sm"
+                  onClick={() => onChange({ ...params, optics: { ...params.optics, ...p.optics } })}
+                  {...glassProps(params)}
+                >
+                  {p.name}
+                </GlassButton>
+              ))}
+            </div>
+          </GlassLightGroup>
         </Group>
 
         <p className="cp-hint">

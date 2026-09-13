@@ -1,17 +1,16 @@
 import { GlassButton, GlassCard, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
 export function CardDemo({ params }: { params: DemoParams }) {
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">02</span>
-        <div className="demo-head-text">
-          <h3>GlassCard</h3>
-          <p>大圆角玻璃卡片，padding 与圆角可调</p>
-        </div>
-      </header>
+    <DemoSection
+      index="02"
+      title="GlassCard"
+      description="大圆角玻璃卡片，padding 与圆角可调"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">卡片 Card</span>
@@ -39,6 +38,6 @@ export function CardDemo({ params }: { params: DemoParams }) {
           </GlassCard>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }

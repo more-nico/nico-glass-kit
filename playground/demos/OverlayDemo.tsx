@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GlassAlert, GlassButton, GlassLightGroup, GlassModal, GlassTooltip } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { DownloadIcon, InfoIcon, PlusIcon } from './icons';
 
@@ -9,14 +10,12 @@ export function OverlayDemo({ params }: { params: DemoParams }) {
   const [alertOpen, setAlertOpen] = useState(true);
 
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">10</span>
-        <div className="demo-head-text">
-          <h3>GlassAlert & GlassTooltip & GlassModal</h3>
-          <p>提示条、悬停气泡与玻璃弹窗；弹窗支持 Esc 与点遮罩关闭</p>
-        </div>
-      </header>
+    <DemoSection
+      index="10"
+      title="GlassAlert & GlassTooltip & GlassModal"
+      description="提示条、悬停气泡与玻璃弹窗；弹窗支持 Esc 与点遮罩关闭"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">提示 Alert</span>
@@ -126,6 +125,6 @@ export function OverlayDemo({ params }: { params: DemoParams }) {
       >
         弹窗内容同样由右侧面板控制：材质、折射、高光与圆角实时生效。
       </GlassModal>
-    </section>
+    </DemoSection>
   );
 }

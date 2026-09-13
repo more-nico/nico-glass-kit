@@ -1,5 +1,6 @@
 import { GlassAvatar, GlassBadge, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
 const AVATAR_IMAGE = `data:image/svg+xml,${encodeURIComponent(
@@ -18,14 +19,12 @@ const AVATAR_IMAGE = `data:image/svg+xml,${encodeURIComponent(
 
 export function IdentityDemo({ params }: { params: DemoParams }) {
   return (
-    <section className="demo-section">
-      <header className="demo-head">
-        <span className="demo-index">08</span>
-        <div className="demo-head-text">
-          <h3>GlassBadge & GlassAvatar</h3>
-          <p>状态标签与玻璃头像：色调圆点跟随明暗自适应</p>
-        </div>
-      </header>
+    <DemoSection
+      index="08"
+      title="GlassBadge & GlassAvatar"
+      description="状态标签与玻璃头像：色调圆点跟随明暗自适应"
+      params={params}
+    >
       <div className="demo-body">
         <div className="demo-group">
           <span className="demo-label">标签 Badge</span>
@@ -64,6 +63,6 @@ export function IdentityDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
       </div>
-    </section>
+    </DemoSection>
   );
 }
