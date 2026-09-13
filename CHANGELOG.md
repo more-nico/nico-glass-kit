@@ -93,6 +93,16 @@
   `rgba(255, 255, 255, 0.58)` becomes `rgba(0, 0, 0, 0.1)`. Hover feedback
   still comes from the brightness boost and the specular rim light, which are
   unchanged. `--ngs-tint-hover` has no other consumer.
+- `GlassSwitch` is glass-cut: the ON track is a thin tint (`--ngs-switch-on`,
+  `rgba(255, 255, 255, 0.18)` over dark and `0.4` over light, down from
+  `--ngs-active-bg`'s 0.22/0.66) and the round knob is no longer a solid
+  `--ngs-text` disc — it uses the new translucent `--ngs-fill-glass` fill plus
+  a top rim highlight, a bottom shade and a drop shadow, so the backdrop stays
+  visible through the knob.
+- `GlassCheckbox` is round now (default `cornerRadius` 7 → 999) and its checked
+  mark is a concentric glass circle instead of a filled rounded square: the
+  same `--ngs-fill-glass` translucent fill with inset rim highlights. The check
+  glyph keeps `--ngs-on-fill` and stays readable over both token sets.
 
 ### Performance
 

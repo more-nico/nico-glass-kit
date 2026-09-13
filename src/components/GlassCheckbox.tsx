@@ -10,7 +10,7 @@ export interface GlassCheckboxProps
   onChange?: (checked: boolean) => void;
   /** Default `'md'`. */
   size?: 'sm' | 'md' | 'lg';
-  /** Corner radius px. Default 7. */
+  /** Corner radius px. Default 999 (round). */
   cornerRadius?: number;
 }
 
@@ -23,7 +23,7 @@ export function GlassCheckbox(props: GlassCheckboxProps) {
     checked = false,
     onChange,
     size = 'md',
-    cornerRadius = 7,
+    cornerRadius = 999,
     className,
     disabled,
     // glass extras

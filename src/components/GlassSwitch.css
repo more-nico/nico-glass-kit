@@ -60,18 +60,22 @@
 }
 
 .ngs-switch[aria-checked='true'] .ngs-switch-track {
-  background: var(--ngs-active-bg);
+  background: var(--ngs-switch-on);
 }
 
+/* Glass knob, not a solid disc: translucent fill + top rim highlight +
+   bottom shade, so the backdrop stays visible through the round part. */
 .ngs-switch-knob {
   position: absolute;
   top: 3px;
   left: 3px;
   border-radius: 999px;
-  background: var(--ngs-text);
+  background: var(--ngs-fill-glass);
   box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    0 2px 6px rgba(0, 0, 0, 0.32),
+    0 0.5px 1px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.7),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.14);
   transition: transform var(--ngs-transition-fast), background-color var(--ngs-transition);
 }
 
