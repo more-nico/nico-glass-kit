@@ -28,6 +28,7 @@
   "scripts": {
     "dev": "vite playground",
     "build": "vite build",
+    "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
