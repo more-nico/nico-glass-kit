@@ -58,7 +58,9 @@ export function GlassSwitch(props: GlassSwitchProps) {
       }}
     >
       <span className="ngs-switch-inner">
-        <span className="ngs-switch-track" aria-hidden="true" />
+        <span className="ngs-switch-rail" aria-hidden="true">
+          <span className="ngs-switch-fill" />
+        </span>
         <span className="ngs-switch-knob" aria-hidden="true" />
       </span>
     </GlassSurface>

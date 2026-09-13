@@ -4,13 +4,16 @@
   max-width: 100%;
 }
 
+/* Inset channel shared with the slider/switch rail. The fill sits flush with
+   the channel (no inner padding) so the two rounded ends stay concentric. */
 .ngs-progress-inner {
   display: flex;
   align-items: stretch;
-  padding: 2px;
   border-radius: 999px;
-  background: var(--ngs-track);
   overflow: hidden;
+  box-shadow:
+    inset 0 1px 1.5px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 0.5px rgba(255, 255, 255, 0.22);
 }
 
 .ngs-progress--sm .ngs-progress-inner {
@@ -25,9 +28,16 @@
   height: 16px;
 }
 
+/* Frosted fill (content layer, never the probed .ngs-effect tint) in the same
+   rail colour as the slider/switch, with the channel's engraved inset edges. */
 .ngs-progress-fill {
   flex: none;
   border-radius: 999px;
-  background: var(--ngs-fill);
-  transition: width var(--ngs-transition);
+  background: var(--ngs-rail-fill);
+  box-shadow:
+    inset 0 1px 1.5px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 0.5px rgba(255, 255, 255, 0.22);
+  transition:
+    width var(--ngs-transition),
+    background-color var(--ngs-transition);
 }

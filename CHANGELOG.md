@@ -37,8 +37,9 @@
   - `GlassAlert`, `GlassModal` (animated enter/exit, Esc and backdrop close)
     and `GlassTooltip` (four placements, hover/focus, Esc close).
 - New control tokens, dark/light pairs: `--ngs-track`, `--ngs-fill`,
-  `--ngs-on-fill` (slider/progress/checkbox/spinner) and
-  `--ngs-tone-info / success / warning / danger` (badge dots, alert icons).
+  `--ngs-on-fill` (slider/progress/checkbox/spinner), `--ngs-rail-fill` /
+  `--ngs-knob-fill` (the slider/switch rail and the clearer knob that rides it)
+  and `--ngs-tone-info / success / warning / danger` (badge dots, alert icons).
 - `--ngs-highlight-color` (default white, unchanged rendering): tints the
   specular glint and pointer sheen of `.ngs-highlight`; `GlassInput`'s
   invalid state sets it to the danger tone together with the rim tokens.
@@ -93,16 +94,37 @@
   `rgba(255, 255, 255, 0.58)` becomes `rgba(0, 0, 0, 0.1)`. Hover feedback
   still comes from the brightness boost and the specular rim light, which are
   unchanged. `--ngs-tint-hover` has no other consumer.
-- `GlassSwitch` is glass-cut: the ON track is a thin tint (`--ngs-switch-on`,
-  `rgba(255, 255, 255, 0.18)` over dark and `0.4` over light, down from
-  `--ngs-active-bg`'s 0.22/0.66) and the round knob is no longer a solid
-  `--ngs-text` disc — it uses the new translucent `--ngs-fill-glass` fill plus
-  a top rim highlight, a bottom shade and a drop shadow, so the backdrop stays
-  visible through the knob.
+- `GlassSwitch` shares the slider's channel language: the ON state is a
+  content-layer frosted progress fill (`--ngs-rail-fill`) that runs from the
+  channel's left end to the knob and ends in a concave notch matching the knob
+  (so the knob rides over empty glass), inside an inset channel; the round knob
+  is no longer a solid `--ngs-text` disc but the clearer `--ngs-knob-fill`
+  glass bead (top rim highlight, bottom shade, drop shadow). The old flat ON
+  tint token (`--ngs-switch-on`) is gone.
+- `GlassProgress` uses the same inset channel and frosted `--ngs-rail-fill`
+  fill as the slider/switch instead of a `--ngs-track` background with a
+  near-solid `--ngs-fill`; the fill now sits flush with the channel (no inner
+  padding) and carries the channel's engraved inset edges.
 - `GlassCheckbox` is round now (default `cornerRadius` 7 → 999) and its checked
   mark is a concentric glass circle instead of a filled rounded square: the
   same `--ngs-fill-glass` translucent fill with inset rim highlights. The check
   glyph keeps `--ngs-on-fill` and stays readable over both token sets.
+- `GlassSlider`'s rail is no longer a 4 px line: it is a full-height inset
+  channel (24 px / 20 px, matching the switch heights) whose selected side is a
+  content-layer frosted fill (`--ngs-fill-glass`, at a lower alpha over light
+  glass so the filled side stays a soft grey instead of a black bar). The fill
+  is clipped to the
+  rail's concentric radius and its right end is a concave notch carved by a
+  radial-gradient mask whose radius equals the thumb, so the frosted layer ends
+  at the thumb's centre and no straight edge crosses the translucent dot. The
+  thumb now reuses `GlassSwitch`'s knob recipe (inset rim highlights, drop
+  shadow) but with a clearer fill than the frosted track
+  (`color-mix(--ngs-fill-glass 40%, transparent)`) instead of a solid
+  `--ngs-text` disc, so it reads as a glass bead over the empty side. The native
+  track is transparent and only stamps the engraved inset edges over the rail;
+  the inner rail radius is derived from the outer `cornerRadius` minus the
+  content padding (`--ngs-slider-radius`) so the two arcs stay concentric when
+  the radius is adjustable.
 
 ### Performance
 

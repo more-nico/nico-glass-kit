@@ -3,24 +3,73 @@
   min-width: 180px;
 }
 
-.ngs-slider-inner {
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
+/* Geometry per size: rail height / half height / inner padding. The surface box
+   height is rail + 2×padding, matching the switch heights (md 32 / sm 26). */
+.ngs-slider--md {
+  --ngs-slider-track-h: 24px;
+  --ngs-slider-half: 12px;
+  --ngs-slider-pad: 4px;
 }
 
-.ngs-slider--sm .ngs-slider-inner {
-  padding: 7px 14px;
+.ngs-slider--sm {
+  --ngs-slider-track-h: 20px;
+  --ngs-slider-half: 10px;
+  --ngs-slider-pad: 3px;
+}
+
+.ngs-slider-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--ngs-slider-pad);
+}
+
+/* Inset recessed channel, clipped to the concentric radius. The frosted fill
+   lives inside and is carved by a concave notch (see below). */
+.ngs-slider-rail {
+  position: absolute;
+  inset: var(--ngs-slider-pad);
+  border-radius: var(--ngs-slider-radius, 999px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Selected side, content layer (never the probed .ngs-effect tint). Its right
+   end is a concave notch whose arc matches the round thumb: the fill therefore
+   ends exactly under the thumb's centre with no straight edge cutting the dot. */
+.ngs-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(
+    var(--ngs-slider-half) +
+      (100% - var(--ngs-slider-track-h)) * var(--ngs-slider-f, 0)
+  );
+  background: var(--ngs-rail-fill);
+  transition: background-color var(--ngs-transition);
+  -webkit-mask: radial-gradient(
+    circle var(--ngs-slider-half) at 100% 50%,
+    transparent calc(var(--ngs-slider-half) - 0.5px),
+    #000 var(--ngs-slider-half)
+  );
+  mask: radial-gradient(
+    circle var(--ngs-slider-half) at 100% 50%,
+    transparent calc(var(--ngs-slider-half) - 0.5px),
+    #000 var(--ngs-slider-half)
+  );
 }
 
 .ngs-slider-field {
+  position: relative;
+  z-index: 1;
   appearance: none;
   -webkit-appearance: none;
   display: block;
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  height: 18px;
+  height: var(--ngs-slider-track-h);
   margin: 0;
   padding: 0;
   background: transparent;
@@ -31,59 +80,60 @@
   cursor: default;
 }
 
+/* Native track is transparent; it only stamps the engraved inset edges over
+   the rail so the whole channel reads as one recessed groove. */
 .ngs-slider-field::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(
-    to right,
-    var(--ngs-fill) 0 var(--ngs-slider-p, 0%),
-    var(--ngs-track) var(--ngs-slider-p, 0%) 100%
-  );
+  height: var(--ngs-slider-track-h);
+  border-radius: var(--ngs-slider-radius, 999px);
+  background: transparent;
+  box-shadow:
+    inset 0 1px 1.5px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 0.5px rgba(255, 255, 255, 0.22);
 }
 
-.ngs-slider--sm .ngs-slider-field::-webkit-slider-runnable-track {
-  height: 3px;
-}
-
+/* Thumb: clearer glass than the fill (translucent fill + strong top rim +
+   bottom shade + drop shadow), rounded to the full rail height so it nests in
+   the frosted notch. */
 .ngs-slider-field::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -6px;
+  width: var(--ngs-slider-track-h);
+  height: var(--ngs-slider-track-h);
+  margin-top: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--ngs-text);
+  background: var(--ngs-knob-fill);
   box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.4),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-}
-
-.ngs-slider--sm .ngs-slider-field::-webkit-slider-thumb {
-  width: 13px;
-  height: 13px;
-  margin-top: -5px;
+    0 2px 7px rgba(0, 0, 0, 0.42),
+    0 0.5px 1px rgba(0, 0, 0, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.85),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.2);
 }
 
 .ngs-slider-field::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--ngs-track);
+  height: var(--ngs-slider-track-h);
+  border-radius: var(--ngs-slider-radius, 999px);
+  background: transparent;
+  box-shadow:
+    inset 0 1px 1.5px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 0.5px rgba(255, 255, 255, 0.22);
 }
 
 .ngs-slider-field::-moz-range-progress {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--ngs-fill);
+  background: transparent;
 }
 
 .ngs-slider-field::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: var(--ngs-slider-track-h);
+  height: var(--ngs-slider-track-h);
   border: 0;
   border-radius: 50%;
-  background: var(--ngs-text);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  background: var(--ngs-knob-fill);
+  box-shadow:
+    0 2px 7px rgba(0, 0, 0, 0.42),
+    0 0.5px 1px rgba(0, 0, 0, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.85),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.2);
 }
 
 .ngs-slider-field:focus-visible {

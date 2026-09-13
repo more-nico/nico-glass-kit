@@ -43,8 +43,11 @@
      backdrop show through, backed by inset rim highlights in the CSS. */
   --ngs-fill-glass: rgba(255, 255, 255, 0.55);
   --ngs-on-fill: rgba(15, 17, 24, 0.95);
-  /* Switch ON track: a thin tint, not a solid fill. */
-  --ngs-switch-on: rgba(255, 255, 255, 0.18);
+  /* Rail fill (slider selected side, switch ON progress) and the clearer knob
+     that rides it: the knob is deliberately more transparent than the rail so
+     it reads as a glass bead over the empty part of the channel. */
+  --ngs-rail-fill: rgba(255, 255, 255, 0.55);
+  --ngs-knob-fill: rgba(255, 255, 255, 0.22);
 
   /* tone glyphs (badge dots / alert icons) */
   --ngs-tone-info: #60a5fa;
@@ -79,7 +82,10 @@
   --ngs-fill: rgba(10, 12, 20, 0.82);
   --ngs-fill-glass: rgba(10, 12, 20, 0.5);
   --ngs-on-fill: rgba(255, 255, 255, 0.96);
-  --ngs-switch-on: rgba(255, 255, 255, 0.4);
+  /* Same dark tone as the rail fill over dark, at a far lower alpha so the
+     filled side stays a soft grey instead of a black bar. */
+  --ngs-rail-fill: rgba(10, 12, 20, 0.3);
+  --ngs-knob-fill: rgba(10, 12, 20, 0.2);
 
   --ngs-tone-info: #1d4ed8;
   --ngs-tone-success: #047857;
