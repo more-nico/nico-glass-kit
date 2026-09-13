@@ -1,4 +1,4 @@
-import { GlassButton, GlassSurface } from 'nico-glass-kit';
+import { GlassButton, GlassLightGroup, GlassSurface } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
 import { useDrag } from './useDrag';
@@ -34,26 +34,28 @@ export function HeroDemo({ params, onShowPill }: Props) {
       </div>
 
       <div className="hero-actions">
-        <GlassButton size="lg" icon={<PlusIcon />} {...glassProps(params)}>
-          新建
-        </GlassButton>
-        <GlassButton
-          variant="icon"
-          size="lg"
-          icon={<HeartIcon />}
-          aria-label="喜欢"
-          {...glassProps(params)}
-        />
-        <GlassButton
-          variant="icon"
-          size="lg"
-          icon={<ShareIcon />}
-          aria-label="分享"
-          {...glassProps(params)}
-        />
-        <GlassButton size="lg" onClick={onShowPill} {...glassProps(params)}>
-          显示 Pill
-        </GlassButton>
+        <GlassLightGroup>
+          <GlassButton size="lg" icon={<PlusIcon />} {...glassProps(params)}>
+            新建
+          </GlassButton>
+          <GlassButton
+            variant="icon"
+            size="lg"
+            icon={<HeartIcon />}
+            aria-label="喜欢"
+            {...glassProps(params)}
+          />
+          <GlassButton
+            variant="icon"
+            size="lg"
+            icon={<ShareIcon />}
+            aria-label="分享"
+            {...glassProps(params)}
+          />
+          <GlassButton size="lg" onClick={onShowPill} {...glassProps(params)}>
+            显示 Pill
+          </GlassButton>
+        </GlassLightGroup>
       </div>
     </section>
   );

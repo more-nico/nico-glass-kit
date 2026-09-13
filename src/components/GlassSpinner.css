@@ -1,0 +1,50 @@
+.ngs-spinner {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.ngs-spinner-inner {
+  position: relative;
+  display: block;
+}
+
+.ngs-spinner--sm .ngs-spinner-inner {
+  width: 32px;
+  height: 32px;
+}
+
+.ngs-spinner--md .ngs-spinner-inner {
+  width: 40px;
+  height: 40px;
+}
+
+.ngs-spinner--lg .ngs-spinner-inner {
+  width: 52px;
+  height: 52px;
+}
+
+.ngs-spinner-ring {
+  position: absolute;
+  inset: 8px;
+  box-sizing: border-box;
+  border: 2.5px solid var(--ngs-track);
+  border-top-color: var(--ngs-fill);
+  border-radius: 50%;
+  animation: ngs-spinner-rotate 0.85s linear infinite;
+}
+
+.ngs-spinner--sm .ngs-spinner-ring {
+  inset: 7px;
+  border-width: 2px;
+}
+
+.ngs-spinner--lg .ngs-spinner-ring {
+  inset: 10px;
+  border-width: 3px;
+}
+
+@keyframes ngs-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}

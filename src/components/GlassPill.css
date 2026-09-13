@@ -13,22 +13,18 @@
 @keyframes ngs-pill-in {
   from {
     transform: translateX(-50%) translateY(-18px) scale(0.9);
-    opacity: 0;
   }
   to {
     transform: translateX(-50%) translateY(0) scale(1);
-    opacity: 1;
   }
 }
 
 @keyframes ngs-pill-out {
   from {
     transform: translateX(-50%) translateY(0) scale(1);
-    opacity: 1;
   }
   to {
     transform: translateX(-50%) translateY(-18px) scale(0.9);
-    opacity: 0;
   }
 }
 

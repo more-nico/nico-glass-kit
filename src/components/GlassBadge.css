@@ -1,0 +1,58 @@
+.ngs-badge {
+  display: inline-block;
+  --ngs-badge-tone: var(--ngs-text-dim);
+}
+
+.ngs-badge[data-tone='info'] {
+  --ngs-badge-tone: var(--ngs-tone-info);
+}
+
+.ngs-badge[data-tone='success'] {
+  --ngs-badge-tone: var(--ngs-tone-success);
+}
+
+.ngs-badge[data-tone='warning'] {
+  --ngs-badge-tone: var(--ngs-tone-warning);
+}
+
+.ngs-badge[data-tone='danger'] {
+  --ngs-badge-tone: var(--ngs-tone-danger);
+}
+
+.ngs-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ngs-badge--sm .ngs-badge-inner {
+  padding: 2px 8px;
+  min-height: 20px;
+  font-size: 11px;
+}
+
+.ngs-badge--md .ngs-badge-inner {
+  padding: 4px 10px;
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.ngs-badge-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ngs-badge-tone);
+  box-shadow: 0 0 6px var(--ngs-badge-tone);
+}
+
+.ngs-badge--sm .ngs-badge-dot {
+  width: 5px;
+  height: 5px;
+}
+
+.ngs-badge-text {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}

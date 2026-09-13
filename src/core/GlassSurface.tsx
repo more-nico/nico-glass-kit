@@ -29,6 +29,10 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   overLight?: OverLight;
   /** Corner radius px. Default 20. */
   cornerRadius?: number;
+  /** Native disabled attribute, used when rendering interactive elements. */
+  disabled?: boolean;
+  /** Native type attribute (e.g. `'button'` when `as="button"`). */
+  type?: string;
   /**
    * Glass material optics: Blur, Saturation, Brightness, Tint, Tint strength,
    * Refraction, Depth, Curvature, Dispersion. Sparse overrides are merged

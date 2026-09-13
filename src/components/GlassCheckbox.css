@@ -1,0 +1,85 @@
+.ngs-checkbox {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform var(--ngs-transition-fast),
+    color var(--ngs-transition),
+    box-shadow var(--ngs-transition);
+}
+
+.ngs-checkbox:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ngs-checkbox:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.ngs-checkbox:focus-visible {
+  outline: 2px solid var(--ngs-focus-ring);
+  outline-offset: 2px;
+}
+
+.ngs-checkbox-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ngs-checkbox--sm .ngs-checkbox-inner {
+  width: 18px;
+  height: 18px;
+}
+
+.ngs-checkbox--md .ngs-checkbox-inner {
+  width: 24px;
+  height: 24px;
+}
+
+.ngs-checkbox--lg .ngs-checkbox-inner {
+  width: 30px;
+  height: 30px;
+}
+
+/* Checked fill sits in the content layer (never the probed effect tint). */
+.ngs-checkbox-mark {
+  position: absolute;
+  inset: 3px;
+  border-radius: 3px;
+  background: var(--ngs-fill);
+  opacity: 0;
+  transform: scale(0.55);
+  transition:
+    opacity var(--ngs-transition-fast),
+    transform var(--ngs-transition-fast);
+}
+
+.ngs-checkbox[aria-checked='true'] .ngs-checkbox-mark {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ngs-checkbox-glyph {
+  position: relative;
+  z-index: 1;
+  width: 60%;
+  height: 60%;
+  color: var(--ngs-on-fill);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--ngs-transition-fast),
+    transform var(--ngs-transition-fast);
+}
+
+.ngs-checkbox[aria-checked='true'] .ngs-checkbox-glyph {
+  opacity: 1;
+  transform: scale(1);
+}

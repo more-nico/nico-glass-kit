@@ -1,0 +1,96 @@
+.ngs-input {
+  display: inline-block;
+  min-width: 160px;
+  cursor: text;
+}
+
+.ngs-input-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ngs-input--sm .ngs-input-inner {
+  padding: 6px 12px;
+  min-height: 32px;
+  font-size: 13px;
+}
+
+.ngs-input--md .ngs-input-inner {
+  padding: 9px 14px;
+  min-height: 40px;
+  font-size: 14px;
+}
+
+.ngs-input--lg .ngs-input-inner {
+  padding: 12px 18px;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.ngs-input-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.ngs-input-field::placeholder {
+  color: var(--ngs-text-dim);
+}
+
+/* Chrome's autofill paint would cover the glass tint. */
+.ngs-input-field:-webkit-autofill {
+  -webkit-text-fill-color: var(--ngs-text);
+}
+
+.ngs-input-affix {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  color: var(--ngs-text-dim);
+}
+
+.ngs-input-affix svg {
+  width: 1.15em;
+  height: 1.15em;
+  display: block;
+}
+
+.ngs-input-affix button {
+  all: unset;
+  display: inline-flex;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.ngs-input:focus-within {
+  outline: 2px solid var(--ngs-focus-ring);
+  outline-offset: 2px;
+}
+
+.ngs-input[data-invalid='true'] {
+  --ngs-focus-ring: var(--ngs-tone-danger);
+  --ngs-glass-tint: var(--ngs-tone-danger);
+  --ngs-glass-tint-strength: 0.28;
+  --ngs-highlight-color: var(--ngs-tone-danger);
+  --ngs-rim-top: color-mix(in srgb, var(--ngs-tone-danger) 82%, transparent);
+  --ngs-rim-top-soft: color-mix(in srgb, var(--ngs-tone-danger) 40%, transparent);
+  --ngs-rim-edge: color-mix(in srgb, var(--ngs-tone-danger) 55%, transparent);
+}
+
+.ngs-input[data-invalid='true'] .ngs-input-affix {
+  color: var(--ngs-tone-danger);
+}
+
+.ngs-input[data-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}

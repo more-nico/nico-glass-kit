@@ -1,0 +1,33 @@
+.ngs-progress {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+}
+
+.ngs-progress-inner {
+  display: flex;
+  align-items: stretch;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--ngs-track);
+  overflow: hidden;
+}
+
+.ngs-progress--sm .ngs-progress-inner {
+  height: 8px;
+}
+
+.ngs-progress--md .ngs-progress-inner {
+  height: 12px;
+}
+
+.ngs-progress--lg .ngs-progress-inner {
+  height: 16px;
+}
+
+.ngs-progress-fill {
+  flex: none;
+  border-radius: 999px;
+  background: var(--ngs-fill);
+  transition: width var(--ngs-transition);
+}

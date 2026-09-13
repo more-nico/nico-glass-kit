@@ -12,6 +12,63 @@
   other. A new decision must hold for 200 ms on top of the existing luminance
   hysteresis before it commits. Renders no DOM; explicit
   `overLight={true|false}` still wins and opts an element out of the group.
+- 13 more ready-made components, all built on `GlassSurface` and all
+  accepting the shared `GlassExtras` props, so the playground's Material /
+  Refraction / Highlight / Elasticity controls and the provider's Quality /
+  Light-Dark controls drive them like the existing components:
+  - `GlassInput` (leading/trailing slots, `size`, `invalid` — red glass tint
+    and red rim highlight/glint from `--ngs-tone-danger`, no outer ring,
+    `disabled`) and `GlassSelect` (custom glass listbox — themed option popup
+    instead of the unstylable OS menu, arrow/Enter/Escape keys, disabled
+    items; option metrics follow the trigger `size`, the popup mirrors the
+    trigger's rendered corner radius (radius clamped to half the trigger
+    height, so capsules stay capsules), clips its rows to the glass
+    silhouette, gives option highlights a concentric radius — popup
+    radius minus the list padding — and follows the pointer with the same
+    elasticity spring and rim glint as the trigger).
+  - `GlassSwitch`, `GlassCheckbox` and `GlassSlider`: controlled selection
+    controls; state fills live in the content layer, never on the probed
+    `.ngs-effect` tint.
+  - `GlassSegmentedControl`: inline capsule picker reusing the active-pill
+    language of `GlassTabBar`.
+  - `GlassBadge` (tone dot) and `GlassAvatar` (image or initials inside the
+    glass rim).
+  - `GlassProgress` and `GlassSpinner`.
+  - `GlassAlert`, `GlassModal` (animated enter/exit, Esc and backdrop close)
+    and `GlassTooltip` (four placements, hover/focus, Esc close).
+- New control tokens, dark/light pairs: `--ngs-track`, `--ngs-fill`,
+  `--ngs-on-fill` (slider/progress/checkbox/spinner) and
+  `--ngs-tone-info / success / warning / danger` (badge dots, alert icons).
+- `--ngs-highlight-color` (default white, unchanged rendering): tints the
+  specular glint and pointer sheen of `.ngs-highlight`; `GlassInput`'s
+  invalid state sets it to the danger tone together with the rim tokens.
+  Pixel-checked against the previous formulas on normal inputs, buttons,
+  cards and avatars: 0 differing pixels (one 480×193 card capture had 30
+  pixels at 1/255).
+- `GlassSurface.disabled` and `GlassSurface.type` are now typed props and are
+  forwarded to the rendered element.
+- The playground gained six new sections (05–10) showing every new component
+  with the right-hand panel bound to it.
+
+### Fixed
+
+- `GlassButton disabled` now actually renders the `disabled` attribute; the
+  prop was consumed for the hover-brightness decision but never forwarded,
+  so the disabled button stayed clickable and hover-styled.
+- `GlassSelect`'s trigger no longer sets `color: inherit`: the trigger is the
+  glass root itself, so the rule overrode the surface's mode-aware
+  `--ngs-text` with the page colour and the value/placeholder stayed
+  page-white over light glass (same class of bug as the `GlassButton` fix in
+  0.3.0). Value, chevron and option text now all follow the resolved mode.
+- Glass-surface entrance animations no longer animate `opacity`. In Chromium
+  an element with a filled opacity animation becomes its own backdrop root,
+  so its `backdrop-filter` samples black: the `GlassSelect` popup, the
+  `GlassModal` panel, `GlassPill` and `GlassTooltip` lost their glass while
+  such an animation was in effect. The popup/panel/pill now use
+  transform-only entrances, the tooltip shows instantly, and the modal
+  overlay fade no longer persists through `fill-mode`. Verified by pixel
+  sampling each surface over different backdrops (select popup center
+  `[4,4,5]` → tracks the backdrop again).
 
 ### Changed
 
@@ -25,6 +82,11 @@
   and may still change instantly.
 - The playground device frame (`BarsDemo`) wraps the floating top bar and the
   bottom tab bar in a `GlassLightGroup` each.
+- Every horizontal row of glass components in the playground now sits in its
+  own `GlassLightGroup` (hero actions, card actions, all demo rows, the modal
+  footer), so a row resolves a single Light/Dark decision instead of one per
+  element — no more half-light rows over gradient backdrops. Vertical stacks
+  (progress bars, alerts) stay per-element.
 - `GlassButton`'s hover tint is ~70 % lighter: `--ngs-tint-hover` drops from
   `rgba(255, 255, 255, 0.18)` to `rgba(255, 255, 255, 0.05)` over dark
   backdrops. Over light backdrops it now darkens instead of washing out —

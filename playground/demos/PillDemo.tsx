@@ -1,4 +1,4 @@
-import { GlassButton, GlassPill } from 'nico-glass-kit';
+import { GlassButton, GlassLightGroup, GlassPill } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
 import { BellIcon } from './icons';
@@ -22,21 +22,25 @@ export function PillDemo({ params, onShowPill }: Props) {
         <div className="demo-group">
           <span className="demo-label">内联预览 Inline</span>
           <div className="demo-row">
-            <GlassPill
-              icon={<BellIcon />}
-              primary="昨天 23:07"
-              secondary="3 条新消息"
-              style={{ position: 'static', animation: 'none' }}
-              {...glassProps(params)}
-            />
+            <GlassLightGroup>
+              <GlassPill
+                icon={<BellIcon />}
+                primary="昨天 23:07"
+                secondary="3 条新消息"
+                style={{ position: 'static', animation: 'none' }}
+                {...glassProps(params)}
+              />
+            </GlassLightGroup>
           </div>
         </div>
         <div className="demo-group">
           <span className="demo-label">浮层 Toast</span>
           <div className="demo-row">
-            <GlassButton size="md" icon={<BellIcon />} onClick={onShowPill} {...glassProps(params)}>
-              弹出通知（4 秒自动消失）
-            </GlassButton>
+            <GlassLightGroup>
+              <GlassButton size="md" icon={<BellIcon />} onClick={onShowPill} {...glassProps(params)}>
+                弹出通知（4 秒自动消失）
+              </GlassButton>
+            </GlassLightGroup>
           </div>
         </div>
       </div>

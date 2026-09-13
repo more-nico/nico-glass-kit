@@ -93,6 +93,69 @@ export const PlusIcon = (p: SVGProps<SVGSVGElement>) =>
     </>,
   );
 
+export const CloseIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </>,
+  );
+
+export const CheckIcon = (p: SVGProps<SVGSVGElement>) => base(p, <path d="m5 12.5 5 5L19 7" />);
+
+export const SunIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </>,
+  );
+
+export const MoonIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(p, <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />);
+
+export const ListIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    </>,
+  );
+
+export const GridIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+    </>,
+  );
+
+export const InfoIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.8h.01" />
+    </>,
+  );
+
+export const DownloadIcon = (p: SVGProps<SVGSVGElement>) =>
+  base(
+    p,
+    <>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M4 21h16" />
+    </>,
+  );
+
 export const HackerNewsIcon = (p: SVGProps<SVGSVGElement>) =>
   base(
     p,

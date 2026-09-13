@@ -1,0 +1,220 @@
+.ngs-select {
+  position: relative;
+  display: inline-block;
+  min-width: 160px;
+  vertical-align: middle;
+}
+
+.ngs-select-trigger {
+  width: 100%;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ngs-select-trigger:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ngs-select-trigger:focus-visible {
+  outline: 2px solid var(--ngs-focus-ring);
+  outline-offset: 2px;
+}
+
+.ngs-select-trigger:not(:disabled):hover .ngs-effect {
+  background-color: var(--ngs-tint-hover);
+}
+
+.ngs-select-trigger-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ngs-select--sm .ngs-select-trigger-inner {
+  padding: 6px 12px;
+  min-height: 32px;
+  font-size: 13px;
+}
+
+.ngs-select--md .ngs-select-trigger-inner {
+  padding: 9px 14px;
+  min-height: 40px;
+  font-size: 14px;
+}
+
+.ngs-select--lg .ngs-select-trigger-inner {
+  padding: 12px 18px;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.ngs-select-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ngs-select[data-placeholder='true'] .ngs-select-value {
+  color: var(--ngs-text-dim);
+}
+
+.ngs-select-affix,
+.ngs-select-chevron {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  color: var(--ngs-text-dim);
+}
+
+.ngs-select-affix svg {
+  width: 1.15em;
+  height: 1.15em;
+  display: block;
+}
+
+.ngs-select-chevron {
+  transition: transform var(--ngs-transition-fast);
+}
+
+.ngs-select-chevron svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.ngs-select[data-open='true'] .ngs-select-chevron {
+  transform: rotate(180deg);
+}
+
+.ngs-select-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 280px;
+  z-index: 50;
+  --ngs-select-list-pad: 5px;
+  /* Clip option highlights to the glass silhouette, so a selected row can
+     never poke out of the rounded corners. */
+  overflow: hidden;
+  transform-origin: top center;
+  /* Transform-only entrance: an opacity animation would keep a composited
+     fill state alive and kill this surface's own backdrop-filter. */
+  animation: ngs-select-pop-in 150ms cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+}
+
+.ngs-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--ngs-select-list-pad);
+}
+
+.ngs-select-option {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  /* Concentric with the popup: outer radius minus the list padding. */
+  border-radius: max(
+    4px,
+    calc(var(--ngs-select-radius, 14px) - var(--ngs-select-list-pad))
+  );
+  background: transparent;
+  color: var(--ngs-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ngs-transition-fast),
+    color var(--ngs-transition-fast);
+}
+
+/* Option metrics follow the trigger's size. */
+.ngs-select-popup--sm {
+  --ngs-select-list-pad: 4px;
+}
+
+.ngs-select-popup--sm .ngs-select-list {
+  gap: 1px;
+}
+
+.ngs-select-popup--sm .ngs-select-option {
+  min-height: 28px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+.ngs-select-popup--lg {
+  --ngs-select-list-pad: 6px;
+}
+
+.ngs-select-popup--lg .ngs-select-list {
+  gap: 3px;
+}
+
+.ngs-select-popup--lg .ngs-select-option {
+  min-height: 40px;
+  padding: 9px 13px;
+  font-size: 15px;
+}
+
+.ngs-select-option-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ngs-select-option:hover:not(:disabled),
+.ngs-select-option.is-active:not(:disabled) {
+  background: var(--ngs-tint-hover);
+}
+
+.ngs-select-option[aria-selected='true'] {
+  background: var(--ngs-active-bg);
+}
+
+.ngs-select-option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ngs-select-option-check {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+}
+
+.ngs-select-option-check svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+@keyframes ngs-select-pop-in {
+  from {
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}

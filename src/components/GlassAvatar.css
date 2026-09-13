@@ -1,0 +1,33 @@
+.ngs-avatar {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.ngs-avatar-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* Inset by 2px so the glass rim stays visible around the photo. */
+.ngs-avatar-img {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  border-radius: 50%;
+  object-fit: cover;
+  user-select: none;
+}
+
+.ngs-avatar-initials {
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--ngs-text);
+  user-select: none;
+}

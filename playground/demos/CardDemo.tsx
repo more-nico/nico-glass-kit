@@ -1,4 +1,4 @@
-import { GlassButton, GlassCard } from 'nico-glass-kit';
+import { GlassButton, GlassCard, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
 
@@ -27,12 +27,14 @@ export function CardDemo({ params }: { params: DemoParams }) {
               <code>scale</code> 参与弹性动画，贴图本身不会重建。
             </p>
             <div className="demo-card-actions">
-              <GlassButton size="sm" {...glassProps(params)}>
-                了解原理
-              </GlassButton>
-              <GlassButton size="sm" {...glassProps(params)}>
-                查看源码
-              </GlassButton>
+              <GlassLightGroup>
+                <GlassButton size="sm" {...glassProps(params)}>
+                  了解原理
+                </GlassButton>
+                <GlassButton size="sm" {...glassProps(params)}>
+                  查看源码
+                </GlassButton>
+              </GlassLightGroup>
             </div>
           </GlassCard>
         </div>

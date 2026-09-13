@@ -51,6 +51,7 @@ export function GlassButton(props: GlassButtonProps) {
       type="button"
       cornerRadius={999}
       className={cls}
+      disabled={disabled}
       quality={quality}
       overLight={overLight}
       optics={optics}

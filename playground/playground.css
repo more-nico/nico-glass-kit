@@ -376,6 +376,45 @@ code {
   min-height: 52px;
 }
 
+/* ---------- new component demos (05-10) ---------- */
+
+.demo-field {
+  width: 220px;
+}
+
+.demo-slider {
+  width: 260px;
+}
+
+.demo-slider--sm {
+  width: 220px;
+}
+
+.demo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ngs-text);
+}
+
+.demo-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 52px;
+}
+
+.demo-progress {
+  width: 320px;
+}
+
+.demo-alert {
+  width: 440px;
+  max-width: 100%;
+}
+
 @media (max-width: 640px) {
   .demo-group {
     grid-template-columns: 1fr;

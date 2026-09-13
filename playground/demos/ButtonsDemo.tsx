@@ -1,4 +1,4 @@
-import { GlassButton } from 'nico-glass-kit';
+import { GlassButton, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { glassProps } from './demoProps';
 import { ChevronLeftIcon, EllipsisIcon, PlusIcon } from './icons';
@@ -17,44 +17,48 @@ export function ButtonsDemo({ params }: { params: DemoParams }) {
         <div className="demo-group">
           <span className="demo-label">胶囊 Capsule</span>
           <div className="demo-row">
-            <GlassButton size="sm" {...glassProps(params)}>
-              小型
-            </GlassButton>
-            <GlassButton size="md" {...glassProps(params)}>
-              标准胶囊
-            </GlassButton>
-            <GlassButton size="lg" icon={<PlusIcon />} {...glassProps(params)}>
-              大型按钮
-            </GlassButton>
-            <GlassButton size="md" disabled {...glassProps(params)}>
-              禁用
-            </GlassButton>
+            <GlassLightGroup>
+              <GlassButton size="sm" {...glassProps(params)}>
+                小型
+              </GlassButton>
+              <GlassButton size="md" {...glassProps(params)}>
+                标准胶囊
+              </GlassButton>
+              <GlassButton size="lg" icon={<PlusIcon />} {...glassProps(params)}>
+                大型按钮
+              </GlassButton>
+              <GlassButton size="md" disabled {...glassProps(params)}>
+                禁用
+              </GlassButton>
+            </GlassLightGroup>
           </div>
         </div>
         <div className="demo-group">
           <span className="demo-label">图标 Icon</span>
           <div className="demo-row">
-            <GlassButton
-              variant="icon"
-              size="sm"
-              icon={<ChevronLeftIcon />}
-              aria-label="返回"
-              {...glassProps(params)}
-            />
-            <GlassButton
-              variant="icon"
-              size="md"
-              icon={<ChevronLeftIcon />}
-              aria-label="返回"
-              {...glassProps(params)}
-            />
-            <GlassButton
-              variant="icon"
-              size="lg"
-              icon={<EllipsisIcon />}
-              aria-label="更多"
-              {...glassProps(params)}
-            />
+            <GlassLightGroup>
+              <GlassButton
+                variant="icon"
+                size="sm"
+                icon={<ChevronLeftIcon />}
+                aria-label="返回"
+                {...glassProps(params)}
+              />
+              <GlassButton
+                variant="icon"
+                size="md"
+                icon={<ChevronLeftIcon />}
+                aria-label="返回"
+                {...glassProps(params)}
+              />
+              <GlassButton
+                variant="icon"
+                size="lg"
+                icon={<EllipsisIcon />}
+                aria-label="更多"
+                {...glassProps(params)}
+              />
+            </GlassLightGroup>
           </div>
         </div>
       </div>

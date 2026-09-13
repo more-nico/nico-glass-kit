@@ -1,0 +1,43 @@
+.ngs-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ngs-tooltip {
+  position: absolute;
+  z-index: 600;
+  pointer-events: none;
+}
+
+.ngs-tooltip--top {
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ngs-tooltip--bottom {
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ngs-tooltip--left {
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ngs-tooltip--right {
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ngs-tooltip-inner {
+  display: block;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}

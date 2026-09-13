@@ -14,8 +14,14 @@ import { BackgroundScene, type BackgroundId } from './demos/BackgroundScene';
 import { BarsDemo } from './demos/BarsDemo';
 import { ButtonsDemo } from './demos/ButtonsDemo';
 import { CardDemo } from './demos/CardDemo';
+import { ControlsDemo } from './demos/ControlsDemo';
 import { HeroDemo } from './demos/HeroDemo';
+import { IdentityDemo } from './demos/IdentityDemo';
+import { InputsDemo } from './demos/InputsDemo';
+import { OverlayDemo } from './demos/OverlayDemo';
 import { PillDemo } from './demos/PillDemo';
+import { ProgressDemo } from './demos/ProgressDemo';
+import { SelectionDemo } from './demos/SelectionDemo';
 import { BellIcon } from './demos/icons';
 import './playground.css';
 
@@ -69,6 +75,12 @@ export default function App() {
           <CardDemo params={params} />
           <BarsDemo params={params} />
           <PillDemo params={params} onShowPill={() => setPillVisible(true)} />
+          <InputsDemo params={params} />
+          <SelectionDemo params={params} />
+          <ControlsDemo params={params} />
+          <IdentityDemo params={params} />
+          <ProgressDemo params={params} />
+          <OverlayDemo params={params} />
         </div>
         <footer className="pg-footer">
           nico-glass-kit · Low / Medium / High 三档渲染 · Chromium 折射，

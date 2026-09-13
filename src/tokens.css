@@ -35,6 +35,17 @@
   --ngs-text-dim: rgba(255, 255, 255, 0.62);
   --ngs-focus-ring: rgba(255, 255, 255, 0.7);
 
+  /* controls (switch / checkbox / slider / progress / spinner) */
+  --ngs-track: rgba(255, 255, 255, 0.18);
+  --ngs-fill: rgba(255, 255, 255, 0.92);
+  --ngs-on-fill: rgba(15, 17, 24, 0.95);
+
+  /* tone glyphs (badge dots / alert icons) */
+  --ngs-tone-info: #60a5fa;
+  --ngs-tone-success: #34d399;
+  --ngs-tone-warning: #fbbf24;
+  --ngs-tone-danger: #f87171;
+
   /* rim light (over dark) */
   --ngs-rim-top: rgba(255, 255, 255, 0.5);
   --ngs-rim-top-soft: rgba(255, 255, 255, 0.16);
@@ -57,6 +68,15 @@
   --ngs-text: rgba(10, 12, 20, 0.88);
   --ngs-text-dim: rgba(10, 12, 20, 0.56);
   --ngs-focus-ring: rgba(10, 12, 20, 0.5);
+
+  --ngs-track: rgba(10, 12, 20, 0.14);
+  --ngs-fill: rgba(10, 12, 20, 0.82);
+  --ngs-on-fill: rgba(255, 255, 255, 0.96);
+
+  --ngs-tone-info: #1d4ed8;
+  --ngs-tone-success: #047857;
+  --ngs-tone-warning: #b45309;
+  --ngs-tone-danger: #b91c1c;
 
   --ngs-rim-top: rgba(255, 255, 255, 0.9);
   --ngs-rim-top-soft: rgba(255, 255, 255, 0.4);

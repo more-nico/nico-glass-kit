@@ -75,7 +75,12 @@
   z-index: 1;
   background: radial-gradient(
     200px circle at var(--ngx, 50%) var(--ngy, 50%),
-    rgb(255 255 255 / calc(0.08 * var(--ngs-spec-o, 0) * var(--ngs-hl, 1))),
+    color-mix(
+        in srgb,
+        var(--ngs-highlight-color, #fff)
+          calc(8% * var(--ngs-spec-o, 0) * var(--ngs-hl, 1)),
+        transparent
+      ),
     transparent 70%
   );
   box-shadow:
@@ -118,8 +123,19 @@
   padding: 2px;
   background: radial-gradient(
     140px circle at var(--ngx, 50%) var(--ngy, 50%),
-    rgb(255 255 255 / calc(0.65 * var(--ngs-spec-o, 0) * var(--ngs-hl, 1))),
-    rgb(255 255 255 / calc(0.18 * var(--ngs-spec-o, 0) * var(--ngs-hl, 1))) 40%,
+    color-mix(
+        in srgb,
+        var(--ngs-highlight-color, #fff)
+          calc(65% * var(--ngs-spec-o, 0) * var(--ngs-hl, 1)),
+        transparent
+      ),
+    color-mix(
+        in srgb,
+        var(--ngs-highlight-color, #fff)
+          calc(18% * var(--ngs-spec-o, 0) * var(--ngs-hl, 1)),
+        transparent
+      )
+      40%,
     transparent 70%
   );
   -webkit-mask:
