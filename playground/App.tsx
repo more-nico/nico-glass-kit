@@ -49,7 +49,7 @@ const DEFAULT_PARAMS: DemoParams = {
   elasticity: 0.2,
   cornerRadius: 32,
   mapRasterScale: DEFAULT_LENS_MAP_RASTER_SCALE,
-  background: 'aurora',
+  background: 'night',
 };
 
 export default function App() {

@@ -1,6 +1,7 @@
-export type BackgroundId = 'aurora' | 'sunset' | 'ocean' | 'text';
+export type BackgroundId = 'night' | 'aurora' | 'sunset' | 'ocean' | 'text';
 
 export const BACKGROUNDS: { id: BackgroundId; label: string }[] = [
+  { id: 'night', label: '星月夜（公有领域）' },
   { id: 'aurora', label: '极光' },
   { id: 'sunset', label: '日落' },
   { id: 'ocean', label: '海洋' },

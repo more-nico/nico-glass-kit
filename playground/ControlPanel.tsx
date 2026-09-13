@@ -277,13 +277,11 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
                 cornerRadius={999}
                 className="cp-bg-btn cp-bg-upload"
                 onClick={() => fileRef.current?.click()}
-                aria-label="上传背景图片"
-                title="上传背景图片"
+                aria-label="自定义背景"
+                title="上传自定义背景图片"
                 {...glassProps(params)}
               >
-                <span className="cp-bg-upload-glyph" aria-hidden="true">
-                  +
-                </span>
+                <span className="cp-bg-upload-label">自定义</span>
               </GlassSurface>
             </div>
           </GlassLightGroup>

@@ -197,6 +197,8 @@ npm run build      # 只打包库（dist/），不打包 playground
 
 ## 许可
 
-MIT，见 [package.json](package.json)。
+MIT，见 [LICENSE](LICENSE)。
+
+playground 内置了一张背景壁纸——梵高《星月夜》（1889），取自 Wikimedia Commons，属于公有领域。
 
 `assets/` 里的演示 GIF 是 playground 的录屏，其中的背景壁纸为演示用途引用的第三方插画，版权归原作者所有，不属于本包的一部分。

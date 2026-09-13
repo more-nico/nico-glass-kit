@@ -3,7 +3,7 @@
 Apple-style glass (iOS 26 feel) as React components — real displacement
 refraction, not just blur.
 
-[中文说明](README.zh-CN.md) · MIT · React 18+
+[中文说明](README.zh-CN.md) · [Live demo](https://nico-glass-kit.vercel.app/) · MIT · React 18+
 
 ![Dragging the hero glass card, with refraction and rim light following the pointer](assets/hero.gif)
 
@@ -172,6 +172,10 @@ The playground in `playground/` runs the components against animated and
 photographic backdrops and drives every material parameter from the right-hand
 panel. Its interface is in Chinese.
 
+A hosted copy runs at **https://nico-glass-kit.vercel.app/**.
+
+To run it locally:
+
 ```bash
 npm run dev   # http://localhost:5173
 ```
@@ -242,7 +246,11 @@ the playground.
 
 ## License
 
-MIT. See [package.json](package.json).
+MIT. See [LICENSE](LICENSE).
+
+The playground ships one bundled background wallpaper — Vincent van Gogh's
+*The Starry Night* (1889), taken from Wikimedia Commons — which is in the public
+domain.
 
 The demo GIFs in `assets/` are recordings of the playground and use a
 third-party illustration as a backdrop purely for demonstration; that artwork

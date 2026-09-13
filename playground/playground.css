@@ -44,6 +44,13 @@ code {
   background-color: #0b0d14;
 }
 
+/* Default backdrop: Van Gogh, The Starry Night (public domain, via Wikimedia
+   Commons). Dense brushwork makes the refraction band read clearly, and being
+   same-origin it is sampled per pixel by overLight="auto". */
+.bg-night {
+  background: #0b0d14 url('/wallpaper/starry-night.jpg') center / cover no-repeat;
+}
+
 .bg-aurora {
   background: #0b0d14;
 }
@@ -1173,6 +1180,12 @@ code {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
+.cp-bg-night {
+  background-image: url('/wallpaper/starry-night.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
 .cp-bg-aurora {
   background: linear-gradient(135deg, #7c3aed, #0ea5e9 55%, #f97316);
 }
@@ -1195,10 +1208,16 @@ code {
     #10131c;
 }
 
-.cp-bg-upload-glyph {
-  font-size: 18px;
-  font-weight: 300;
+/* Custom-background chooser: a capsule two swatches wide instead of a round
+   chip carrying a + glyph. */
+.cp-bg-upload {
+  width: calc(40px * 2 + 10px);
+}
+
+.cp-bg-upload-label {
+  font-size: 12px;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .cp-slider {
