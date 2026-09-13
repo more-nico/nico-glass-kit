@@ -6,9 +6,22 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+/*
+ * The dim lives on this child pseudo-element, never on the overlay itself: an
+ * opacity animation on an ancestor of the glass panel turns that ancestor into
+ * its own backdrop root, so the panel's backdrop-filter only samples the
+ * (empty) root and goes black for the whole fade — the opening "black flash".
+ * Animating the pseudo-element keeps the panel's backdrop root at the page.
+ * Clicks land on the overlay (pseudo-elements are not event targets), so the
+ * backdrop-close handler still works.
+ */
+.ngs-modal-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: rgba(8, 10, 16, 0.42);
-  /* No fill: a persistent opacity animation on an ancestor would turn it
-     into a backdrop root and hide the page behind the panel's glass. */
   animation: ngs-modal-fade-in 200ms ease;
 }
 
@@ -16,14 +29,32 @@
   outline: none;
 }
 
-.ngs-modal-overlay.is-leaving {
+.ngs-modal-overlay.is-leaving::before {
   animation: ngs-modal-fade-out 200ms ease forwards;
 }
 
 .ngs-modal-panel {
+  /* The surface itself must not be the scroll container: the high-tier
+     elasticity spring translates .ngs-motion, and Chromium counts a
+     transformed descendant's border box in scrollable overflow — hovering the
+     panel's right/bottom edge popped 2 px scrollbars. Clip the elastic shift
+     here and scroll the content layer instead. */
+  display: flex;
+  flex-direction: column;
   max-height: calc(100vh - 48px);
-  overflow: auto;
+  overflow: hidden;
   animation: ngs-modal-pop-in 260ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+}
+
+.ngs-modal-panel .ngs-motion {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.ngs-modal-panel .ngs-content {
+  min-height: 0;
+  overflow: auto;
 }
 
 .ngs-modal-overlay.is-leaving .ngs-modal-panel {

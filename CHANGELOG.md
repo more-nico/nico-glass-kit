@@ -70,6 +70,22 @@
   overlay fade no longer persists through `fill-mode`. Verified by pixel
   sampling each surface over different backdrops (select popup center
   `[4,4,5]` → tracks the backdrop again).
+- `GlassModal` no longer flashes black while opening. The overlay still faded
+  its own `opacity` in, which made it a backdrop root for the duration of the
+  fade, so the panel's `backdrop-filter` sampled black until the animation
+  ended. The dim now lives on an `::before` pseudo-element that fades instead,
+  keeping the overlay transparent (opacity 1) and the panel's backdrop root at
+  the page. Verified on a bright backdrop: the panel center now tracks the
+  dimmed backdrop through the whole entrance instead of dropping to
+  `[16,20,27]`.
+- `GlassModal` no longer shows thin scrollbars when the pointer reaches the
+  panel's right or bottom edge. The panel was the scroll container
+  (`overflow: auto`) while the high-tier elasticity spring translates
+  `.ngs-motion`; Chromium counts a transformed descendant's border box in
+  scrollable overflow, so hovering an edge added ~2 px and popped scrollbars.
+  The surface is now `overflow: hidden` and the content layer (`.ngs-content`)
+  scrolls instead, so the elastic shift is clipped and cannot create overflow;
+  tall content still scrolls.
 
 ### Changed
 
