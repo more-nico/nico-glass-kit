@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { GlassButton, GlassLightGroup, GlassSurface, GlassTabBar } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n, type MessageKey } from '../i18n';
 import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { WeiboFeed } from './WeiboFeed';
@@ -15,7 +16,7 @@ import {
 
 interface FeedSource {
   key: string;
-  label: string;
+  labelKey: MessageKey;
   icon: ReactNode;
   kind: 'dom' | 'web';
   url?: string;
@@ -26,36 +27,37 @@ interface FeedSource {
  *  被拦截禁用：news.ycombinator.com (XFO DENY) · lite.cnn.com / arxiv.org (frame-ancestors 'none')。
  *  备选池：https://en.m.wikipedia.org/wiki/Wikipedia:Featured_articles */
 const FEEDS: FeedSource[] = [
-  { key: 'weibo', label: '微博', kind: 'dom', icon: <WeiboIcon /> },
+  { key: 'weibo', labelKey: 'bars.feed.weibo', kind: 'dom', icon: <WeiboIcon /> },
   {
     key: 'wiki',
-    label: '维基',
+    labelKey: 'bars.feed.wiki',
     kind: 'web',
     url: 'https://en.wikipedia.org/wiki/Portal:Current_events',
     icon: <WikipediaIcon />,
   },
   {
     key: 'solidot',
-    label: 'Solidot',
+    labelKey: 'bars.feed.solidot',
     kind: 'web',
     url: 'https://www.solidot.org/',
     icon: <SolidotIcon />,
   },
-  { key: 'npr', label: 'NPR', kind: 'web', url: 'https://text.npr.org/', icon: <NprIcon /> },
+  { key: 'npr', labelKey: 'bars.feed.npr', kind: 'web', url: 'https://text.npr.org/', icon: <NprIcon /> },
 ];
 
-function formatClock(date: Date) {
-  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+function formatClock(date: Date, locale: string) {
+  return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 export function BarsDemo({ params }: { params: DemoParams }) {
+  const { t, locale } = useI18n();
   const [active, setActive] = useState(FEEDS[0].key);
   const [loaded, setLoaded] = useState<Set<string>>(() => new Set([FEEDS[0].key]));
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(t);
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const selectFeed = (key: string) => {
@@ -68,13 +70,13 @@ export function BarsDemo({ params }: { params: DemoParams }) {
   return (
     <DemoSection
       index="03"
-      title="悬浮顶栏 · 实时信息流"
-      description="iOS 26 三件式悬浮玻璃顶栏，内嵌 DOM 信息流与公网页面真实滚动"
+      title={t('bars.title')}
+      description={t('bars.description')}
       params={params}
     >
       <div className="demo-body">
         <div className="demo-group">
-          <span className="demo-label">设备框 Device</span>
+          <span className="demo-label">{t('bars.label.device')}</span>
           <div className="phone-frame">
             <div className="phone-bg">
               <div className="blob blob-1" />
@@ -95,7 +97,7 @@ export function BarsDemo({ params }: { params: DemoParams }) {
                     key={feed.key}
                     className="phone-iframe"
                     src={feed.url}
-                    title={feed.label}
+                    title={t(feed.labelKey)}
                     style={{ display: feed.key === active ? 'block' : 'none' }}
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                     referrerPolicy="no-referrer"
@@ -109,18 +111,18 @@ export function BarsDemo({ params }: { params: DemoParams }) {
                   variant="icon"
                   size="sm"
                   icon={<ChevronLeftIcon />}
-                  aria-label="返回"
+                  aria-label={t('common.back')}
                   {...glass}
                 />
                 <GlassSurface cornerRadius={999} className="feed-clock" {...glass}>
-                  <span className="feed-clock-primary">今天</span>
-                  <span className="feed-clock-secondary">{formatClock(now)}</span>
+                  <span className="feed-clock-primary">{t('bars.today')}</span>
+                  <span className="feed-clock-secondary">{formatClock(now, locale)}</span>
                 </GlassSurface>
                 <GlassButton
                   variant="icon"
                   size="sm"
                   icon={<EllipsisIcon />}
-                  aria-label="更多"
+                  aria-label={t('common.more')}
                   {...glass}
                 />
               </GlassLightGroup>
@@ -146,11 +148,11 @@ export function BarsDemo({ params }: { params: DemoParams }) {
                   icon={feed.icon}
                   style={{ left: `calc(50% - 177.5px + ${i * 90}px)` }}
                   aria-pressed={feed.key === active}
-                  aria-label={`切换到 ${feed.label}`}
+                  aria-label={t('bars.switchTo', { name: t(feed.labelKey) })}
                   onClick={() => selectFeed(feed.key)}
                   {...glass}
                 >
-                  {feed.label}
+                  {t(feed.labelKey)}
                 </GlassButton>
               ))}
             </GlassLightGroup>

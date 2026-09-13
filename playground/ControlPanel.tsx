@@ -15,7 +15,8 @@ import {
   type OverLight,
 } from 'nico-glass-kit';
 import type { DemoParams } from './App';
-import { BACKGROUNDS } from './demos/BackgroundScene';
+import { useI18n, type MessageKey } from './i18n';
+import { BACKGROUND_IDS } from './demos/BackgroundScene';
 import { glassProps } from './demos/demoProps';
 
 interface Props {
@@ -48,9 +49,9 @@ function overLightFromKey(key: string): OverLight {
 }
 
 /** Presets are sparse optics layers over DEFAULT_OPTICS (ported from the reference). */
-const PRESETS: { name: string; optics: Partial<GlassOptics> }[] = [
+const PRESETS: { key: MessageKey; optics: Partial<GlassOptics> }[] = [
   {
-    name: '含蓄 Subtle',
+    key: 'panel.preset.subtle',
     optics: {
       blur: 18,
       saturation: 110,
@@ -62,11 +63,11 @@ const PRESETS: { name: string; optics: Partial<GlassOptics> }[] = [
     },
   },
   {
-    name: '默认 Default',
+    key: 'panel.preset.default',
     optics: { ...DEFAULT_OPTICS },
   },
   {
-    name: '清透 Clear',
+    key: 'panel.preset.clear',
     optics: {
       blur: 8,
       saturation: 106,
@@ -78,7 +79,7 @@ const PRESETS: { name: string; optics: Partial<GlassOptics> }[] = [
     },
   },
   {
-    name: '夸张 Vivid',
+    key: 'panel.preset.vivid',
     optics: {
       blur: 26,
       saturation: 165,
@@ -169,6 +170,7 @@ function Group(props: { title: string; children: React.ReactNode }) {
 }
 
 export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const set = <K extends keyof DemoParams>(key: K, value: DemoParams[K]) =>
@@ -198,7 +200,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
         size="md"
         className="cp-toggle"
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? '收起控制面板' : '展开控制面板'}
+        aria-label={open ? t('panel.collapse') : t('panel.expand')}
         icon={<span aria-hidden="true">{open ? '→' : '←'}</span>}
         {...glassProps(params)}
       />
@@ -210,9 +212,9 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
         elasticity={0}
       >
         <h1 className="cp-title">Nico Glass</h1>
-        <p className="cp-subtitle">nico-glass-kit playground</p>
+        <p className="cp-subtitle">{t('panel.subtitle')}</p>
 
-        <Group title="渲染 Quality">
+        <Group title={t('panel.group.quality')}>
           <GlassSegmentedControl
             className="cp-seg-control"
             size="sm"
@@ -231,26 +233,29 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
         </Group>
 
-        <Group title="背景 Background">
+        <Group title={t('panel.group.background')}>
           <GlassLightGroup>
             <div className="cp-bgs">
-              {BACKGROUNDS.map((b) => (
-                <GlassSurface
-                  key={b.id}
-                  as="button"
-                  type="button"
-                  cornerRadius={999}
-                  className={['cp-bg-btn', params.background === b.id && 'is-active']
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => set('background', b.id)}
-                  aria-label={b.label}
-                  title={b.label}
-                  {...glassProps(params)}
-                >
-                  <span className={`cp-bg-swatch cp-bg-${b.id}`} aria-hidden="true" />
-                </GlassSurface>
-              ))}
+              {BACKGROUND_IDS.map((id) => {
+                const label = t(`bg.${id}`);
+                return (
+                  <GlassSurface
+                    key={id}
+                    as="button"
+                    type="button"
+                    cornerRadius={999}
+                    className={['cp-bg-btn', params.background === id && 'is-active']
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => set('background', id)}
+                    aria-label={label}
+                    title={label}
+                    {...glassProps(params)}
+                  >
+                    <span className={`cp-bg-swatch cp-bg-${id}`} aria-hidden="true" />
+                  </GlassSurface>
+                );
+              })}
               {customBg && (
                 <GlassSurface
                   as="button"
@@ -260,8 +265,8 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
                     .filter(Boolean)
                     .join(' ')}
                   onClick={() => set('background', 'custom')}
-                  aria-label="自定义背景"
-                  title="自定义背景"
+                  aria-label={t('panel.customBackground')}
+                  title={t('panel.customBackground')}
                   {...glassProps(params)}
                 >
                   <span
@@ -277,11 +282,11 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
                 cornerRadius={999}
                 className="cp-bg-btn cp-bg-upload"
                 onClick={() => fileRef.current?.click()}
-                aria-label="自定义背景"
-                title="上传自定义背景图片"
+                aria-label={t('panel.customBackground')}
+                title={t('panel.uploadTitle')}
                 {...glassProps(params)}
               >
-                <span className="cp-bg-upload-label">自定义</span>
+                <span className="cp-bg-upload-label">{t('panel.custom')}</span>
               </GlassSurface>
             </div>
           </GlassLightGroup>
@@ -297,9 +302,9 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
         </Group>
 
-        <Group title="材质 Material">
+        <Group title={t('panel.group.material')}>
           <Slider
-            label="模糊 Blur"
+            label={t('panel.blur')}
             min={0}
             max={64}
             step={1}
@@ -309,7 +314,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
-            label="饱和度 Saturation"
+            label={t('panel.saturation')}
             min={0}
             max={300}
             step={1}
@@ -319,7 +324,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
-            label="亮度 Brightness"
+            label={t('panel.brightness')}
             min={0}
             max={2}
             step={0.01}
@@ -330,7 +335,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
           <div className="cp-slider">
             <span className="cp-slider-head">
-              <span>染色 Tint</span>
+              <span>{t('panel.tint')}</span>
               <span className="cp-slider-val">{tintIsAuto ? 'auto' : tintToHex(tint)}</span>
             </span>
             <div className="cp-tint-row">
@@ -339,13 +344,13 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
                 className="cp-color"
                 value={tintToHex(tint)}
                 onChange={(e) => setOptics('tint', e.target.value)}
-                aria-label="Tint 颜色"
+                aria-label={t('panel.tintColor')}
               />
               <GlassButton
                 size="sm"
                 onClick={() => setOptics('tint', DEFAULT_OPTICS.tint)}
                 disabled={tintIsAuto}
-                title="恢复 light-dark 明暗自适应"
+                title={t('panel.tintRestore')}
                 {...glassProps(params)}
               >
                 Auto
@@ -353,7 +358,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             </div>
           </div>
           <Slider
-            label="染色强度 Tint strength"
+            label={t('panel.tintStrength')}
             min={0}
             max={1}
             step={0.01}
@@ -364,9 +369,9 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
         </Group>
 
-        <Group title="性能 Performance">
+        <Group title={t('panel.group.performance')}>
           <Slider
-            label="贴图精度 Map scale"
+            label={t('panel.mapScale')}
             min={MIN_LENS_MAP_RASTER_SCALE}
             max={MAX_LENS_MAP_RASTER_SCALE}
             step={0.05}
@@ -376,15 +381,16 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <p className="cp-hint">
-            折射位移贴图的清晰度：越低，浏览器每帧的准备成本越小、折射边缘越柔和。
-            默认 {Math.round(DEFAULT_LENS_MAP_RASTER_SCALE * 100)}%，上限{' '}
-            {Math.round(MAX_LENS_MAP_RASTER_SCALE * 100)}%，可继续调低做对比。
+            {t('panel.mapScaleHint', {
+              default: Math.round(DEFAULT_LENS_MAP_RASTER_SCALE * 100),
+              max: Math.round(MAX_LENS_MAP_RASTER_SCALE * 100),
+            })}
           </p>
         </Group>
 
-        <Group title="折射 Refraction">
+        <Group title={t('panel.group.refraction')}>
           <Slider
-            label="折射 Refraction"
+            label={t('panel.refraction')}
             min={0}
             max={1}
             step={0.01}
@@ -394,7 +400,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
-            label="折射带 Depth"
+            label={t('panel.depth')}
             min={0}
             max={40}
             step={1}
@@ -404,7 +410,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
-            label="曲率 Curvature"
+            label={t('panel.curvature')}
             min={0}
             max={1}
             step={0.01}
@@ -414,7 +420,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
-            label="色散 Dispersion"
+            label={t('panel.dispersion')}
             min={0}
             max={1}
             step={0.01}
@@ -425,9 +431,9 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
         </Group>
 
-        <Group title="交互 Interaction">
+        <Group title={t('panel.group.interaction')}>
           <Slider
-            label="高光 Highlight"
+            label={t('panel.highlight')}
             min={0}
             max={2}
             step={0.05}
@@ -437,7 +443,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
-            label="弹性 Elasticity"
+            label={t('panel.elasticity')}
             min={0}
             max={0.5}
             step={0.01}
@@ -447,9 +453,9 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
         </Group>
 
-        <Group title="形状 Shape">
+        <Group title={t('panel.group.shape')}>
           <Slider
-            label="圆角 Radius"
+            label={t('panel.radius')}
             min={8}
             max={80}
             step={1}
@@ -460,27 +466,24 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
           />
         </Group>
 
-        <Group title="预设 Presets">
+        <Group title={t('panel.group.presets')}>
           <GlassLightGroup>
             <div className="cp-presets">
               {PRESETS.map((p) => (
                 <GlassButton
-                  key={p.name}
+                  key={p.key}
                   size="sm"
                   onClick={() => onChange({ ...params, optics: { ...params.optics, ...p.optics } })}
                   {...glassProps(params)}
                 >
-                  {p.name}
+                  {t(p.key)}
                 </GlassButton>
               ))}
             </div>
           </GlassLightGroup>
         </Group>
 
-        <p className="cp-hint">
-          高光会跟随鼠标方向；移出后回到均匀描边。折射仅在 Chromium
-          生效（backdrop-filter: url()），Safari / Firefox 自动降级为 Low。
-        </p>
+        <p className="cp-hint">{t('panel.hint')}</p>
       </GlassCard>
     </aside>
   );

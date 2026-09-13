@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   DEFAULT_LENS_MAP_RASTER_SCALE,
   DEFAULT_OPTICS,
-  GlassBadge,
   GlassLightGroup,
   GlassNavBar,
   GlassPill,
@@ -13,6 +12,8 @@ import {
   type OverLight,
 } from 'nico-glass-kit';
 import { glassProps } from './demos/demoProps';
+import { useI18n } from './i18n';
+import { LanguageSwitcher } from './i18n/LanguageSwitcher';
 import { ControlPanel } from './ControlPanel';
 import { FpsMeter } from './FpsMeter';
 import { BackgroundScene, type BackgroundId } from './demos/BackgroundScene';
@@ -53,6 +54,7 @@ const DEFAULT_PARAMS: DemoParams = {
 };
 
 export default function App() {
+  const { t } = useI18n();
   const [params, setParams] = useState<DemoParams>(DEFAULT_PARAMS);
   const [customBg, setCustomBg] = useState<string | null>(null);
   const [pillVisible, setPillVisible] = useState(false);
@@ -75,11 +77,7 @@ export default function App() {
                 <span>nico-glass-kit</span>
               </span>
             }
-            trailing={
-              <GlassBadge size="sm" {...glassProps(params)}>
-                Nico Glass
-              </GlassBadge>
-            }
+            trailing={<LanguageSwitcher params={params} />}
             {...glassProps(params)}
           />
         </GlassLightGroup>
@@ -100,10 +98,7 @@ export default function App() {
           <OverlayDemo params={params} />
         </div>
         <GlassSurface as="footer" className="pg-footer" {...glassProps(params)}>
-          <p className="pg-footer-text">
-            nico-glass-kit · Low / Medium / High 三档渲染 · Chromium 折射，
-            其余浏览器自动降级
-          </p>
+          <p className="pg-footer-text">{t('app.footer')}</p>
         </GlassSurface>
       </main>
 
@@ -116,8 +111,8 @@ export default function App() {
         onClose={() => setPillVisible(false)}
         autoHideDuration={4000}
         icon={<BellIcon />}
-        primary="昨天 23:07"
-        secondary="3 条新消息"
+        primary={t('app.pill.primary')}
+        secondary={t('app.pill.secondary')}
         optics={params.optics}
         highlightIntensity={params.highlight}
         elasticity={0}

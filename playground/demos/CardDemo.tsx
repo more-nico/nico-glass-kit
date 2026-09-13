@@ -1,37 +1,42 @@
 import { GlassButton, GlassCard, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n } from '../i18n';
 import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
 export function CardDemo({ params }: { params: DemoParams }) {
+  const { t } = useI18n();
+
   return (
     <DemoSection
       index="02"
       title="GlassCard"
-      description="大圆角玻璃卡片，padding 与圆角可调"
+      description={t('card.description')}
       params={params}
     >
       <div className="demo-body">
         <div className="demo-group">
-          <span className="demo-label">卡片 Card</span>
+          <span className="demo-label">{t('card.label')}</span>
           <GlassCard
             className="demo-card"
             cornerRadius={params.cornerRadius}
             {...glassProps(params)}
           >
-            <h4 className="demo-card-title">液态玻璃卡片</h4>
+            <h4 className="demo-card-title">{t('card.title')}</h4>
             <p className="demo-card-text">
-              边缘折射由圆角矩形 SDF 与 curvature/depth 参数实时生成位移贴图并按
-              几何缓存复用；鼠标靠近时只有 <code>feDisplacementMap</code> 的{' '}
-              <code>scale</code> 参与弹性动画，贴图本身不会重建。
+              {t('card.body.before')}
+              <code>feDisplacementMap</code>
+              {t('card.body.mid')}
+              <code>scale</code>
+              {t('card.body.after')}
             </p>
             <div className="demo-card-actions">
               <GlassLightGroup>
                 <GlassButton size="sm" {...glassProps(params)}>
-                  了解原理
+                  {t('card.learn')}
                 </GlassButton>
                 <GlassButton size="sm" {...glassProps(params)}>
-                  查看源码
+                  {t('card.source')}
                 </GlassButton>
               </GlassLightGroup>
             </div>

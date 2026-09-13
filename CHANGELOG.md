@@ -4,6 +4,14 @@
 
 ### Added
 
+- Playground interface languages: Chinese, English, Russian, Japanese and
+  Korean, switchable from a segmented control in the top nav bar. Every string
+  now comes from a typed dictionary (including the mock Weibo feed and the
+  background text wall), the language is detected from the browser and kept in
+  `localStorage`, and the choice updates `document.lang` and the page title.
+- Playground chrome: the top nav bar is now sticky and its trailing slot holds
+  only the language switcher (the `Nico Glass` badge was dropped); the control
+  panel is pinned below the nav so the two never overlap.
 - `GlassLightGroup`: binds several `overLight='auto'` glass elements into one
   recognition group. The group samples the area its members cover (each member
   probed with all member subtrees excluded, per-member means combined by

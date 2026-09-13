@@ -1,5 +1,6 @@
 import { GlassAvatar, GlassBadge, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n } from '../i18n';
 import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
@@ -18,47 +19,59 @@ const AVATAR_IMAGE = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 
 export function IdentityDemo({ params }: { params: DemoParams }) {
+  const { t } = useI18n();
+
   return (
     <DemoSection
       index="08"
       title="GlassBadge & GlassAvatar"
-      description="状态标签与玻璃头像：色调圆点跟随明暗自适应"
+      description={t('identity.description')}
       params={params}
     >
       <div className="demo-body">
         <div className="demo-group">
-          <span className="demo-label">标签 Badge</span>
+          <span className="demo-label">{t('identity.label.badge')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <GlassBadge dot {...glassProps(params)}>
-                已连接
+                {t('identity.connected')}
               </GlassBadge>
               <GlassBadge dot tone="info" {...glassProps(params)}>
-                同步中
+                {t('identity.syncing')}
               </GlassBadge>
               <GlassBadge dot tone="success" {...glassProps(params)}>
-                已完成
+                {t('identity.done')}
               </GlassBadge>
               <GlassBadge dot tone="warning" {...glassProps(params)}>
-                待确认
+                {t('identity.pending')}
               </GlassBadge>
               <GlassBadge dot tone="danger" {...glassProps(params)}>
-                已过期
+                {t('identity.expired')}
               </GlassBadge>
               <GlassBadge size="sm" {...glassProps(params)}>
-                12 条未读
+                {t('identity.unread')}
               </GlassBadge>
             </GlassLightGroup>
           </div>
         </div>
         <div className="demo-group">
-          <span className="demo-label">头像 Avatar</span>
+          <span className="demo-label">{t('identity.label.avatar')}</span>
           <div className="demo-row">
             <GlassLightGroup>
-              <GlassAvatar size="sm" initials="李" {...glassProps(params)} />
-              <GlassAvatar size="md" initials="玻" {...glassProps(params)} />
-              <GlassAvatar size="lg" src={AVATAR_IMAGE} alt="示例头像" {...glassProps(params)} />
-              <GlassAvatar size={64} src={AVATAR_IMAGE} alt="自定义尺寸头像" {...glassProps(params)} />
+              <GlassAvatar size="sm" initials={t('identity.initials.sm')} {...glassProps(params)} />
+              <GlassAvatar size="md" initials={t('identity.initials.md')} {...glassProps(params)} />
+              <GlassAvatar
+                size="lg"
+                src={AVATAR_IMAGE}
+                alt={t('identity.alt.avatar')}
+                {...glassProps(params)}
+              />
+              <GlassAvatar
+                size={64}
+                src={AVATAR_IMAGE}
+                alt={t('identity.alt.custom')}
+                {...glassProps(params)}
+              />
             </GlassLightGroup>
           </div>
         </div>

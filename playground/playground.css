@@ -177,11 +177,12 @@ code {
 /* ---------- page frame ---------- */
 
 .pg-header {
-  position: relative;
-  z-index: 1;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   max-width: 940px;
   margin: 0 auto;
-  padding: 22px 32px 0;
+  padding: 12px 32px 0;
 }
 
 /* GlassNavBar is fixed by default; embed it in the page flow instead. */
@@ -189,6 +190,20 @@ code {
   position: static;
   left: auto;
   right: auto;
+}
+
+/*
+ * Language switcher lives in the navbar trailing row. Five languages at the
+ * segmented control's default sm min-width (52px per segment) would crowd the
+ * badge, so tighten each segment here.
+ */
+.pg-lang {
+  flex: 0 0 auto;
+}
+
+.pg-lang .ngs-segment {
+  min-width: 30px;
+  padding: 5px 8px;
 }
 
 .pg-brand {
@@ -1005,18 +1020,23 @@ code {
 
 /* ---------- control panel ---------- */
 
+/*
+ * The panel is pinned below the sticky glass nav so the two never overlap:
+ * top clears the nav, bottom keeps a viewport-edge gap, and the card body
+ * scrolls inside the remaining height (height: 100% down to .ngs-card-body).
+ */
 .cp {
   position: fixed;
-  top: 50%;
+  top: 84px;
+  bottom: 24px;
   right: 24px;
-  transform: translateY(-50%);
   width: 300px;
   z-index: 300;
   transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .cp--closed {
-  transform: translateY(-50%) translateX(calc(100% + 8px));
+  transform: translateX(calc(100% + 8px));
 }
 
 /* Positioning only — the glass fill, radius and hover live in GlassButton. */
@@ -1028,6 +1048,7 @@ code {
 
 .cp-card {
   width: 100%;
+  height: 100%;
   display: block;
   /*
    * Scroll lives on the content layer. Keeping `overflow` off the glass root
@@ -1039,7 +1060,9 @@ code {
 }
 
 .cp-card .ngs-card-body {
-  max-height: 86vh;
+  box-sizing: border-box;
+  height: 100%;
+  max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -1295,7 +1318,11 @@ code {
     right: 12px;
     top: -44px;
   }
+  .cp-card {
+    height: auto;
+  }
   .cp-card .ngs-card-body {
+    height: auto;
     max-height: 52vh;
   }
   .pg-main {
@@ -1372,9 +1399,9 @@ code {
 
 @media (max-width: 900px) {
   .pg-fps {
-    left: auto;
+    left: 12px;
     bottom: auto;
-    top: 12px;
-    right: 12px;
+    top: 72px;
+    right: auto;
   }
 }

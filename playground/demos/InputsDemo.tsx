@@ -1,44 +1,46 @@
 import { useState } from 'react';
 import { GlassInput, GlassLightGroup, GlassSelect } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n } from '../i18n';
 import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { CloseIcon, InfoIcon, SearchIcon } from './icons';
 
-const KIND_ITEMS = [
-  { key: 'photo', label: '照片' },
-  { key: 'video', label: '视频' },
-  { key: 'audio', label: '音频' },
-  { key: 'live', label: '直播（暂不可用）', disabled: true },
-];
-
-const SIZE_ITEMS = [
-  { key: 'sm', label: '小尺寸' },
-  { key: 'md', label: '标准尺寸' },
-  { key: 'lg', label: '大尺寸' },
-];
-
 export function InputsDemo({ params }: { params: DemoParams }) {
-  const [query, setQuery] = useState('液态玻璃');
+  const { t } = useI18n();
+  const [query, setQuery] = useState(() => t('inputs.query'));
   const [kind, setKind] = useState('photo');
   const [size, setSize] = useState('md');
+
+  const kindItems = [
+    { key: 'photo', label: t('inputs.kind.photo') },
+    { key: 'video', label: t('inputs.kind.video') },
+    { key: 'audio', label: t('inputs.kind.audio') },
+    { key: 'live', label: t('inputs.kind.live'), disabled: true },
+  ];
+
+  const sizeItems = [
+    { key: 'sm', label: t('inputs.size.sm') },
+    { key: 'md', label: t('inputs.size.md') },
+    { key: 'lg', label: t('inputs.size.lg') },
+  ];
 
   return (
     <DemoSection
       index="05"
       title="GlassInput & GlassSelect"
-      description="文本输入与下拉选择：图标、前后缀、校验态与禁用态"
+      description={t('inputs.description')}
       params={params}
     >
       <div className="demo-body">
         <div className="demo-group">
-          <span className="demo-label">尺寸 Size</span>
+          <span className="demo-label">{t('inputs.label.size')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <GlassInput
                 className="demo-field"
                 size="sm"
-                placeholder="小尺寸 sm"
+                placeholder={t('inputs.placeholder.sm')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />
@@ -46,7 +48,7 @@ export function InputsDemo({ params }: { params: DemoParams }) {
                 className="demo-field"
                 size="md"
                 leading={<SearchIcon />}
-                placeholder="搜索组件…"
+                placeholder={t('inputs.placeholder.search')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 {...glassProps(params)}
@@ -55,7 +57,7 @@ export function InputsDemo({ params }: { params: DemoParams }) {
               <GlassInput
                 className="demo-field"
                 size="lg"
-                placeholder="大尺寸 lg"
+                placeholder={t('inputs.placeholder.lg')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />
@@ -63,13 +65,13 @@ export function InputsDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
         <div className="demo-group">
-          <span className="demo-label">状态 State</span>
+          <span className="demo-label">{t('inputs.label.state')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <GlassInput
                 className="demo-field"
                 invalid
-                defaultValue="格式不正确"
+                defaultValue={t('inputs.invalid')}
                 leading={<InfoIcon />}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
@@ -77,18 +79,22 @@ export function InputsDemo({ params }: { params: DemoParams }) {
               <GlassInput
                 className="demo-field"
                 disabled
-                placeholder="禁用 disabled"
+                placeholder={t('inputs.placeholder.disabled')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />
               <GlassInput
                 className="demo-field"
-                placeholder="带清除按钮"
+                placeholder={t('inputs.placeholder.clearable')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 trailing={
                   query ? (
-                    <button type="button" onClick={() => setQuery('')} aria-label="清除">
+                    <button
+                      type="button"
+                      onClick={() => setQuery('')}
+                      aria-label={t('inputs.aria.clear')}
+                    >
                       <CloseIcon />
                     </button>
                   ) : undefined
@@ -100,44 +106,44 @@ export function InputsDemo({ params }: { params: DemoParams }) {
           </div>
         </div>
         <div className="demo-group">
-          <span className="demo-label">选择 Select</span>
+          <span className="demo-label">{t('inputs.label.select')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <GlassSelect
                 className="demo-field"
-                items={KIND_ITEMS}
+                items={kindItems}
                 value={kind}
                 onChange={setKind}
-                aria-label="内容类型"
+                aria-label={t('inputs.aria.kind')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />
               <GlassSelect
                 className="demo-field"
                 size="sm"
-                items={SIZE_ITEMS}
+                items={sizeItems}
                 value={size}
                 onChange={setSize}
-                aria-label="尺寸"
+                aria-label={t('inputs.aria.size')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />
               <GlassSelect
                 className="demo-field"
-                items={SIZE_ITEMS}
-                placeholder="禁用状态"
+                items={sizeItems}
+                placeholder={t('inputs.placeholder.selectDisabled')}
                 disabled
-                aria-label="禁用选择"
+                aria-label={t('inputs.aria.disabled')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />
               <GlassSelect
                 className="demo-field"
                 size="lg"
-                items={SIZE_ITEMS}
+                items={sizeItems}
                 value={size}
                 onChange={setSize}
-                aria-label="尺寸（大号）"
+                aria-label={t('inputs.aria.sizeLg')}
                 {...glassProps(params)}
                 cornerRadius={params.cornerRadius}
               />

@@ -1,60 +1,63 @@
 import { GlassButton, GlassLightGroup } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n } from '../i18n';
 import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 import { ChevronLeftIcon, EllipsisIcon, PlusIcon } from './icons';
 
 export function ButtonsDemo({ params }: { params: DemoParams }) {
+  const { t } = useI18n();
+
   return (
     <DemoSection
       index="01"
       title="GlassButton"
-      description="胶囊按钮与圆形图标按钮，悬停提亮、按压回弹"
+      description={t('buttons.description')}
       params={params}
     >
       <div className="demo-body">
         <div className="demo-group">
-          <span className="demo-label">胶囊 Capsule</span>
+          <span className="demo-label">{t('buttons.label.capsule')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <GlassButton size="sm" {...glassProps(params)}>
-                小型
+                {t('buttons.sm')}
               </GlassButton>
               <GlassButton size="md" {...glassProps(params)}>
-                标准胶囊
+                {t('buttons.md')}
               </GlassButton>
               <GlassButton size="lg" icon={<PlusIcon />} {...glassProps(params)}>
-                大型按钮
+                {t('buttons.lg')}
               </GlassButton>
               <GlassButton size="md" disabled {...glassProps(params)}>
-                禁用
+                {t('buttons.disabled')}
               </GlassButton>
             </GlassLightGroup>
           </div>
         </div>
         <div className="demo-group">
-          <span className="demo-label">图标 Icon</span>
+          <span className="demo-label">{t('buttons.label.icon')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <GlassButton
                 variant="icon"
                 size="sm"
                 icon={<ChevronLeftIcon />}
-                aria-label="返回"
+                aria-label={t('common.back')}
                 {...glassProps(params)}
               />
               <GlassButton
                 variant="icon"
                 size="md"
                 icon={<ChevronLeftIcon />}
-                aria-label="返回"
+                aria-label={t('common.back')}
                 {...glassProps(params)}
               />
               <GlassButton
                 variant="icon"
                 size="lg"
                 icon={<EllipsisIcon />}
-                aria-label="更多"
+                aria-label={t('common.more')}
                 {...glassProps(params)}
               />
             </GlassLightGroup>

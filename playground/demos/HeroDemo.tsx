@@ -1,5 +1,6 @@
 import { GlassButton, GlassLightGroup, GlassSurface } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n } from '../i18n';
 import { glassProps } from './demoProps';
 import { useDrag } from './useDrag';
 import { HeartIcon, PlusIcon, ShareIcon } from './icons';
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function HeroDemo({ params, onShowPill }: Props) {
+  const { t } = useI18n();
   const { pos, handlers } = useDrag();
 
   return (
@@ -28,7 +30,7 @@ export function HeroDemo({ params, onShowPill }: Props) {
         >
           <div className="hero-glass-inner">
             <span className="hero-title">Nico Glass</span>
-            <span className="hero-sub">拖动我 · Drag me · 观察边缘折射与高光</span>
+            <span className="hero-sub">{t('hero.drag')}</span>
           </div>
         </GlassSurface>
       </div>
@@ -36,24 +38,24 @@ export function HeroDemo({ params, onShowPill }: Props) {
       <div className="hero-actions">
         <GlassLightGroup>
           <GlassButton size="lg" icon={<PlusIcon />} {...glassProps(params)}>
-            新建
+            {t('hero.new')}
           </GlassButton>
           <GlassButton
             variant="icon"
             size="lg"
             icon={<HeartIcon />}
-            aria-label="喜欢"
+            aria-label={t('hero.like')}
             {...glassProps(params)}
           />
           <GlassButton
             variant="icon"
             size="lg"
             icon={<ShareIcon />}
-            aria-label="分享"
+            aria-label={t('hero.share')}
             {...glassProps(params)}
           />
           <GlassButton size="lg" onClick={onShowPill} {...glassProps(params)}>
-            显示 Pill
+            {t('hero.showPill')}
           </GlassButton>
         </GlassLightGroup>
       </div>

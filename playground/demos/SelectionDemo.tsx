@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { GlassCheckbox, GlassLightGroup, GlassSwitch } from 'nico-glass-kit';
 import type { DemoParams } from '../App';
+import { useI18n } from '../i18n';
 import { DemoSection } from './DemoSection';
 import { glassProps } from './demoProps';
 
 export function SelectionDemo({ params }: { params: DemoParams }) {
+  const { t } = useI18n();
   const [wifi, setWifi] = useState(true);
   const [bluetooth, setBluetooth] = useState(false);
   const [power, setPower] = useState(true);
@@ -17,35 +19,35 @@ export function SelectionDemo({ params }: { params: DemoParams }) {
     <DemoSection
       index="06"
       title="GlassSwitch & GlassCheckbox"
-      description="开关与勾选框：受控组件，键盘可聚焦，勾选态在玻璃内淡入"
+      description={t('selection.description')}
       params={params}
     >
       <div className="demo-body">
         <div className="demo-group">
-          <span className="demo-label">开关 Switch</span>
+          <span className="demo-label">{t('selection.label.switch')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <span className="demo-toggle">
                 <GlassSwitch checked={wifi} onChange={setWifi} {...glassProps(params)} />
-                <span>无线局域网</span>
+                <span>{t('selection.wifi')}</span>
               </span>
               <span className="demo-toggle">
                 <GlassSwitch checked={bluetooth} onChange={setBluetooth} size="sm" {...glassProps(params)} />
-                <span>蓝牙 sm</span>
+                <span>{t('selection.bluetooth')}</span>
               </span>
               <span className="demo-toggle">
                 <GlassSwitch checked={power} onChange={setPower} size="lg" {...glassProps(params)} />
-                <span>大型 lg</span>
+                <span>{t('selection.large')}</span>
               </span>
               <span className="demo-toggle">
                 <GlassSwitch checked disabled {...glassProps(params)} />
-                <span>禁用</span>
+                <span>{t('selection.disabled')}</span>
               </span>
             </GlassLightGroup>
           </div>
         </div>
         <div className="demo-group">
-          <span className="demo-label">勾选 Checkbox</span>
+          <span className="demo-label">{t('selection.label.checkbox')}</span>
           <div className="demo-row">
             <GlassLightGroup>
               <span className="demo-toggle">
@@ -54,7 +56,7 @@ export function SelectionDemo({ params }: { params: DemoParams }) {
                   onChange={() => toggle('motion')}
                   {...glassProps(params)}
                 />
-                <span>动态效果</span>
+                <span>{t('selection.motion')}</span>
               </span>
               <span className="demo-toggle">
                 <GlassCheckbox
@@ -63,7 +65,7 @@ export function SelectionDemo({ params }: { params: DemoParams }) {
                   size="sm"
                   {...glassProps(params)}
                 />
-                <span>边缘折射 sm</span>
+                <span>{t('selection.refract')}</span>
               </span>
               <span className="demo-toggle">
                 <GlassCheckbox
@@ -72,11 +74,11 @@ export function SelectionDemo({ params }: { params: DemoParams }) {
                   size="lg"
                   {...glassProps(params)}
                 />
-                <span>提示音 lg</span>
+                <span>{t('selection.sound')}</span>
               </span>
               <span className="demo-toggle">
                 <GlassCheckbox checked={false} disabled {...glassProps(params)} />
-                <span>禁用</span>
+                <span>{t('selection.disabled')}</span>
               </span>
             </GlassLightGroup>
           </div>
