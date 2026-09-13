@@ -47,16 +47,19 @@ else ships as plain TS + CSS.
 
 ## Install
 
-The package is **not published to npm yet**, so install it from the repository:
+```bash
+npm install nico-glass-kit
+```
+
+To track the repository instead of a release, install it from GitHub — a
+`prepare` script builds `dist/` during install:
 
 ```bash
 npm install github:more-nico/nico-glass-kit
 ```
 
-A `prepare` script builds `dist/` during install, so no extra step is needed.
-
-To work on the kit itself, use a checkout instead and point your app at it (the
-package publishes `dist/` only):
+To work on the kit itself, use a checkout and point your app at it (the package
+publishes `dist/` only):
 
 ```bash
 git clone https://github.com/more-nico/nico-glass-kit.git

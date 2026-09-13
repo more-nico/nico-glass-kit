@@ -28,13 +28,16 @@
 
 ## 安装
 
-这个包**还没有发布到 npm**，请从仓库安装：
+```bash
+npm install nico-glass-kit
+```
+
+想跟着仓库而不是发布版本走，可以从 GitHub 安装——仓库里有 `prepare` 脚本，
+安装过程会自动构建 `dist/`：
 
 ```bash
 npm install github:more-nico/nico-glass-kit
 ```
-
-仓库里有 `prepare` 脚本，安装过程会自动构建 `dist/`，不需要额外步骤。
 
 如果你想改这个库本身，就用源码检出，再让应用指向它（包里只发布 `dist/`）：
 

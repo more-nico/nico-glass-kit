@@ -215,6 +215,10 @@
 
 ## 0.3.0
 
+First public release: `npm install nico-glass-kit`. The published tarball holds
+`dist/` (ESM, CJS, `style.css`, declaration files) plus the license and both
+READMEs — the demo GIFs in `assets/` are repository-only.
+
 ### Breaking changes
 
 - `overLight: 'auto'` no longer follows `prefers-color-scheme`. Every glass
