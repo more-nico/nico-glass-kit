@@ -28,6 +28,7 @@
   "scripts": {
     "dev": "vite playground",
     "build": "vite build",
+    "build:playground": "vite build playground",
     "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "typecheck": "tsc --noEmit",
