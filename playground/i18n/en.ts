@@ -216,6 +216,21 @@ export const en = {
   'overlay.modal.body':
     'The modal body is driven by the right-hand panel too: material, refraction, highlight and radius update live.',
 
+  'text.label.material': 'Same material comparison',
+  'text.grid': 'High-contrast grid',
+  'text.ascii': 'All 95 printable ASCII characters (␠ marks space)',
+  'text.title': 'GlassText',
+  'text.description':
+    'Text whose glyphs are the glass itself: the outline refracts the backdrop and carries a rim light',
+  'text.label.lockscreen': 'Lockscreen clock',
+  'text.label.input': 'Character input',
+  'text.date': 'Monday, September 21',
+  'text.hint': 'Drag the digits up/down to resize',
+  'text.inputPlaceholder': 'Type 1–4 characters',
+  'text.inputAria': 'Glass glyph preview characters',
+  'text.inputHint':
+    'Up to {max} displayable ASCII characters (0x20–0x7E) · {count} used',
+
   'feed.logo': 'Weibo',
   'feed.search': 'Trending: City Night Flight Notes',
   'feed.forward': 'Reposts',

@@ -5,7 +5,7 @@ export { GlassProvider } from './core/GlassProvider';
 export type { GlassConfig, GlassProviderProps } from './core/GlassProvider';
 
 export { GlassSurface } from './core/GlassSurface';
-export type { GlassSurfaceProps } from './core/GlassSurface';
+export type { GlassSurfaceProps, GlassGlyphShape } from './core/GlassSurface';
 
 export { GlassLightGroup } from './core/GlassLightGroup';
 export type { GlassLightGroupProps } from './core/GlassLightGroup';
@@ -27,6 +27,36 @@ export {
   MAX_LENS_MAP_RASTER_SCALE,
 } from './core/displacementMap';
 export type { LensMapOptions, LensMapResult } from './core/displacementMap';
+
+export {
+  generateGlyphRaster,
+  computeGlyphLensPixels,
+  signedDistanceField,
+  glyphRingAlpha,
+  glyphRasterCacheKey,
+  clearGlyphRasterCache,
+  glyphRasterCacheStats,
+  setGlyphRasterObserver,
+  layoutGlyphs,
+  measureTextMetrics,
+  defaultGlyphRasterScale,
+  GLYPH_TILE_PADDING,
+  DEFAULT_GLYPH_RING_WIDTH,
+  GLYPH_RASTER_CACHE_LIMIT,
+} from './core/glyphLensMap';
+export type {
+  GlyphRaster,
+  GlyphRasterOptions,
+  GlyphLensOptions,
+  GlyphLensResult,
+  GlyphMetrics,
+  GlyphBox,
+  GlyphLayout,
+  GlyphLayoutOptions,
+  TextMetricsLike,
+} from './core/glyphLensMap';
+
+export type { GlassFilterPreset } from './core/SvgFilterRegistry';
 
 export {
   supportsBackdropFilter,
@@ -89,3 +119,6 @@ export type { GlassModalProps } from './components/GlassModal';
 
 export { GlassTooltip } from './components/GlassTooltip';
 export type { GlassTooltipProps, GlassTooltipPlacement } from './components/GlassTooltip';
+
+export { GlassText } from './components/GlassText';
+export type { GlassTextProps } from './components/GlassText';

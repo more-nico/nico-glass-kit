@@ -1,0 +1,43 @@
+/* GlassText: one absolutely positioned GlassSurface tile per character. */
+
+.ngs-text {
+  position: relative;
+  display: inline-block;
+  white-space: pre;
+  /* The canvas layout owns the box once ready; until then the fallback text
+     sizes the element naturally. */
+}
+
+/* Plain-text fallback: in flow so the container keeps the text baseline, and
+   never removed from the accessibility tree. */
+.ngs-text-fallback {
+  display: inline-block;
+  white-space: pre;
+}
+
+/* Ready: the glass tiles carry the text. The fallback is clipped rather than
+   hidden so assistive technology still reads it. */
+.ngs-text[data-ngs-text-ready] .ngs-text-fallback {
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
+.ngs-text[data-ngs-text-ready] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Font-size probe: 1em square, invisible, never in the layout flow. */
+.ngs-text-probe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1em;
+  height: 1em;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ngs-text .ngs-text-tile {
+  position: absolute;
+}

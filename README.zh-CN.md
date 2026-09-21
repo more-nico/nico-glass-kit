@@ -152,6 +152,7 @@ export function Demo() {
 | [`GlassAvatar`](src/components/GlassAvatar.tsx) | 玻璃边框内的图片或首字头像。 |
 | [`GlassProgress`](src/components/GlassProgress.tsx) | 复用同一套控件轨道的进度条。 |
 | [`GlassSpinner`](src/components/GlassSpinner.tsx) | 加载环。 |
+| [`GlassText`](src/components/GlassText.tsx) | 字形本身就是玻璃，支持全部 95 个可显示 ASCII 字符。 |
 | [`GlassAlert`](src/components/GlassAlert.tsx) | 按色调着色的行内提示，可关闭。 |
 
 ### 面板与浮层
@@ -162,6 +163,15 @@ export function Demo() {
 | [`GlassPill`](src/components/GlassPill.tsx) | 悬浮通知胶囊 / Toast，带进入退出动画。 |
 | [`GlassModal`](src/components/GlassModal.tsx) | 带动画的弹窗面板，Esc 或点遮罩关闭。 |
 | [`GlassTooltip`](src/components/GlassTooltip.tsx) | 悬停 / 聚焦气泡，四个方向。 |
+
+### 玻璃文字
+
+每个可见字符都是使用字形遮罩和距离场的 `GlassSurface`，材质参数与其他表面含义一致，没有文字专属增亮或折射削弱。空格只占位；`tabularNums` 使用完整十个数字的最大字宽。字体加载和响应式字号变化会更新几何；服务端首屏和 Canvas 失败时保留可读文本。
+
+```tsx
+<GlassText text="01:00" fontSize={132} fontWeight={600} tabularNums />
+<GlassText text="B8@%" optics={{ refraction: 1, depth: 8 }} />
+```
 
 ### 所有组件共享的参数
 

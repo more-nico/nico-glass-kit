@@ -12,6 +12,11 @@
  */
 
 export const MAX_DISPLACEMENT_PX = 24;
+/** Shared CSS-to-raster bevel width and CSS displacement amplitude. */
+export const lensEdgePixels = (edge: number, quality: number): number =>
+  Math.max(0.5, Math.max(0.5, edge) * quality);
+export const lensDisplacementScale = (strength: number): number =>
+  Math.min(1, Math.max(0, strength)) * MAX_DISPLACEMENT_PX * (255 / 127);
 export const LENS_MAP_CACHE_LIMIT = 32;
 
 /**
@@ -152,7 +157,7 @@ export function normaliseLensOptions(options: LensMapOptions): NormalisedLensSha
     pixelWidth,
     pixelHeight,
     radius: clamp(options.radius * quality, 0, maxRadius),
-    edge: Math.max(0.5, options.edge * quality),
+    edge: lensEdgePixels(options.edge, quality),
     curvature: clamp(options.curvature, 0, 1),
     strength: clamp(options.strength, 0, 1),
     rasterScale: clampLensMapRasterScale(options.rasterScale),
@@ -173,8 +178,26 @@ export function lensMapCacheKey(options: LensMapOptions): string {
   ].join(':');
 }
 
-function encode(value: number): number {
+/**
+ * 8-bit displacement encoding, shared with the glyph lens path
+ * (`glyphLensMap.ts`) so both shapes refract through the same formula.
+ */
+export function encodeDisplacement(value: number): number {
   return clamp(128 + Math.round(value * 127), 1, 255);
+}
+
+/**
+ * Bevel profile, 0 at the interior end of the band and 1 at the rim.
+ * `t = clamp(-sd / edge, 0, 1)`: `bucket` is the (1-t)² falloff, `squircle`
+ * the fuller squircle falloff; `curvature` blends between them. Shared with
+ * the glyph lens path.
+ */
+export function lensProfile(t: number, curvature: number): number {
+  const u = 1 - t;
+  const bucket = u * u;
+  const u4 = u * u * u * u;
+  const squircle = 1 - Math.sqrt(Math.sqrt(Math.max(0, 1 - u4)));
+  return bucket + (squircle - bucket) * curvature;
 }
 
 /**
@@ -225,17 +248,13 @@ export function computeLensPixels(options: LensMapOptions): Uint8ClampedArray {
       }
 
       const t = clamp(-sd / edge, 0, 1);
-      const u = 1 - t;
-      const bucket = u * u;
-      const u4 = u * u * u * u;
-      const squircle = 1 - Math.sqrt(Math.sqrt(Math.max(0, 1 - u4)));
-      const profile = bucket + (squircle - bucket) * curvature;
+      const profile = lensProfile(t, curvature);
 
       // Inward displacement (samples from inside the shape, matching convex lensing).
       const dx = -ox * profile;
       const dy = -oy * profile;
-      const r = encode(dx);
-      const g = encode(dy);
+      const r = encodeDisplacement(dx);
+      const g = encodeDisplacement(dy);
 
       setPixel(x, y, r, g);
       const mx = pw - 1 - x;
@@ -332,7 +351,7 @@ export function generateLensMap(options: LensMapOptions): LensMapResult {
     pixelHeight: shape.pixelHeight,
     quality: shape.quality,
     rasterScale: shape.rasterScale,
-    maxScale: shape.strength * MAX_DISPLACEMENT_PX * (255 / 127),
+    maxScale: lensDisplacementScale(shape.strength),
     pixels,
     dataUrl,
   };

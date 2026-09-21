@@ -28,6 +28,7 @@ import { OverlayDemo } from './demos/OverlayDemo';
 import { PillDemo } from './demos/PillDemo';
 import { ProgressDemo } from './demos/ProgressDemo';
 import { SelectionDemo } from './demos/SelectionDemo';
+import { TextDemo } from './demos/TextDemo';
 import { BellIcon } from './demos/icons';
 import './playground.css';
 
@@ -96,6 +97,7 @@ export default function App() {
           <IdentityDemo params={params} />
           <ProgressDemo params={params} />
           <OverlayDemo params={params} />
+          <TextDemo params={params} />
         </div>
         <GlassSurface as="footer" className="pg-footer" {...glassProps(params)}>
           <p className="pg-footer-text">{t('app.footer')}</p>

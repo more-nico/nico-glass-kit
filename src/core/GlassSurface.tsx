@@ -12,9 +12,34 @@ import {
 } from 'react';
 import { useGlassQuality, type GlassQuality } from './useGlassQuality';
 import { useOverLight, type OverLight } from './useOverLight';
-import { useGlassFilter } from './SvgFilterRegistry';
+import { useGlassFilter, type GlassFilterPreset } from './SvgFilterRegistry';
 import { GlassConfigContext } from './GlassProvider';
 import { DEFAULT_OPTICS, resolveOptics, type GlassOptics } from './optics';
+
+/**
+ * Prebuilt glyph tile (see `glyphLensMap.ts` / `GlassText`). When present the
+ * surface stops being a rounded rectangle: the corner radius is forced to 0,
+ * the effect layer is masked to the glyph coverage and the highlight layer to
+ * its outline ring, and the displacement map is the preset instead of a
+ * generated rectangle map.
+ */
+export interface GlassGlyphShape {
+  /** Identity of the raster (character + font + geometry + optics). */
+  key: string;
+  /** Coverage mask PNG data URL (glyph fill). */
+  maskUrl: string;
+  /** Outline ring PNG data URL (highlight mask). */
+  ringUrl: string;
+  /** Pointer glint's wider inner outline. Defaults to ringUrl for older shapes. */
+  glintUrl?: string;
+  /** Displacement map PNG data URL. */
+  mapUrl: string;
+  /** Value for `feDisplacementMap@scale`. */
+  scale: number;
+  /** Tile box, CSS px. */
+  width: number;
+  height: number;
+}
 
 export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   /** Rendered element, default `'div'`. */
@@ -29,6 +54,8 @@ export interface GlassSurfaceProps extends HTMLAttributes<HTMLElement> {
   overLight?: OverLight;
   /** Corner radius px. Default 20. */
   cornerRadius?: number;
+  /** Glyph tile: renders the character's own outline as the glass shape. */
+  glyphShape?: GlassGlyphShape | null;
   /** Native disabled attribute, used when rendering interactive elements. */
   disabled?: boolean;
   /** Native type attribute (e.g. `'button'` when `as="button"`). */
@@ -88,6 +115,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     quality,
     overLight,
     cornerRadius = 20,
+    glyphShape,
     optics,
     elasticity = 0.2,
     highlightIntensity = 1,
@@ -148,23 +176,50 @@ export function GlassSurface(props: GlassSurfaceProps) {
     [],
   );
 
-  const needsFilter =
-    resolvedQuality !== 'low' && size.width >= 2 && size.height >= 2;
+  // A glyph tile is only a glyph when it has a real mask: an empty URL would
+  // otherwise render as a rectangular glass block.
+  const glyph = glyphShape && glyphShape.maskUrl ? glyphShape : null;
+  const hasGlyph = glyph !== null;
+  const glyphKey = glyph?.key ?? '';
+  const glyphMapUrl = glyph?.mapUrl ?? '';
+  const glyphScale = glyph?.scale ?? 0;
+  const glyphWidth = glyph?.width ?? 0;
+  const glyphHeight = glyph?.height ?? 0;
+  const glyphPreset = useMemo<GlassFilterPreset | undefined>(
+    () =>
+      hasGlyph
+        ? {
+            key: glyphKey,
+            url: glyphMapUrl,
+            scale: glyphScale,
+            width: glyphWidth,
+            height: glyphHeight,
+          }
+        : undefined,
+    [hasGlyph, glyphKey, glyphMapUrl, glyphScale, glyphWidth, glyphHeight],
+  );
+
+  // Glyph tiles carry their own raster box, so the tier alone decides whether
+  // a filter is needed — no ResizeObserver round trip.
+  const needsFilter = hasGlyph
+    ? resolvedQuality !== 'low' && glyphWidth >= 2 && glyphHeight >= 2
+    : resolvedQuality !== 'low' && size.width >= 2 && size.height >= 2;
   // hoverBrightnessBoost forces a private filter: a shared entry would leak
   // the boosted slopes to every element with identical geometry.
   const { filterId, baseScaleRef, setFilterScale, setFilterBrightness } = useGlassFilter({
     enabled: needsFilter,
     shared: resolvedQuality === 'medium' && hoverBrightnessBoost <= 0,
     map: {
-      width: size.width,
-      height: size.height,
-      radius: cornerRadius,
-      edge: Math.max(material.depth, 0.5),
+      width: hasGlyph ? glyphWidth : size.width,
+      height: hasGlyph ? glyphHeight : size.height,
+      radius: hasGlyph ? 0 : cornerRadius,
+      edge: material.depth,
       curvature: material.curvature,
       strength: material.refraction,
       dpr,
       rasterScale: provider.lensMapRasterScale,
     },
+    preset: glyphPreset,
     blur: material.blur,
     saturation: material.saturation,
     brightness: material.brightness,
@@ -349,8 +404,16 @@ export function GlassSurface(props: GlassSurfaceProps) {
   const AnyComp = Comp as ElementType;
 
   const surfaceStyle = {
-    borderRadius: cornerRadius,
+    // A glyph has no corners and no box to cast a shadow from.
+    borderRadius: glyph ? 0 : cornerRadius,
     '--ngs-hl': highlightIntensity,
+    ...(glyph
+      ? {
+          '--ngs-shape-mask': `url("${glyph.maskUrl}")`,
+          '--ngs-shape-ring': `url("${glyph.ringUrl}")`,
+          '--ngs-shape-glint': `url("${glyph.glintUrl ?? glyph.ringUrl}")`,
+        }
+      : null),
     ...style,
   } as CSSProperties;
 
@@ -361,6 +424,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
       className={cls}
       data-ngs-quality={resolvedQuality}
       data-ngs-light={light ? 'true' : 'false'}
+      data-ngs-shape={glyph ? 'glyph' : undefined}
       style={surfaceStyle}
       onPointerEnter={(e: ReactPointerEvent<HTMLElement>) => {
         if (hoverBrightnessBoost > 0) applyHoverBrightness(true);

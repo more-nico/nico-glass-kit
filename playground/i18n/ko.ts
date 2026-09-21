@@ -213,6 +213,20 @@ export const ko = {
   'overlay.modal.body':
     '모달 내용도 오른쪽 패널로 제어됩니다. 재질, 굴절, 하이라이트, 모서리 반경이 실시간으로 반영됩니다.',
 
+  'text.label.material': '동일 재질 비교',
+  'text.grid': '고대비 격자',
+  'text.ascii': '표시 가능한 ASCII 95자 (␠는 공백)',
+  'text.title': 'GlassText',
+  'text.description':
+    '글리프 자체가 유리: 외곽선이 배경을 굴절시키고 가장자리에 하이라이트가 흐른다',
+  'text.label.lockscreen': '잠금 화면 시계',
+  'text.label.input': '문자 입력',
+  'text.date': '9월 21일 월요일',
+  'text.hint': '숫자를 위아래로 드래그해 크기 변경',
+  'text.inputPlaceholder': '1–4자 입력',
+  'text.inputAria': '유리 글리프 미리보기 문자',
+  'text.inputHint': '표시 가능한 ASCII(0x20–0x7E) 최대 {max}자 · 입력 {count}',
+
   'feed.logo': 'Weibo',
   'feed.search': '실시간 검색: 도시 야간 비행 노트',
   'feed.forward': '리포스트',

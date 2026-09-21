@@ -179,6 +179,7 @@ a toolbar row, a tab bar, a footer — so the whole strip flips at once.
 | [`GlassAvatar`](src/components/GlassAvatar.tsx) | Image or initials inside the glass rim. |
 | [`GlassProgress`](src/components/GlassProgress.tsx) | Progress bar on the shared control rail. |
 | [`GlassSpinner`](src/components/GlassSpinner.tsx) | Loading ring. |
+| [`GlassText`](src/components/GlassText.tsx) | Glyph-shaped glass for all 95 printable ASCII characters. |
 | [`GlassAlert`](src/components/GlassAlert.tsx) | Tone-aware inline alert with optional dismiss. |
 
 ### Panels & overlays
@@ -189,6 +190,15 @@ a toolbar row, a tab bar, a footer — so the whole strip flips at once.
 | [`GlassPill`](src/components/GlassPill.tsx) | Floating notification capsule / toast with enter and exit animation. |
 | [`GlassModal`](src/components/GlassModal.tsx) | Animated modal panel, closed by Esc or backdrop click. |
 | [`GlassTooltip`](src/components/GlassTooltip.tsx) | Hover/focus bubble in four placements. |
+
+### Glass text
+
+Each visible glyph is a `GlassSurface` with a glyph mask and distance field. Optical parameters retain the same meaning as other surfaces; there is no text-specific brightness boost or refraction reduction. Spaces advance without painting. `tabularNums` uses the widest of all ten digits. Font loading and responsive sizes rebuild the geometry; SSR and canvas failures retain readable text.
+
+```tsx
+<GlassText text="01:00" fontSize={132} fontWeight={600} tabularNums />
+<GlassText text="B8@%" optics={{ refraction: 1, depth: 8 }} />
+```
 
 ### Props shared by every component
 

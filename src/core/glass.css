@@ -154,3 +154,43 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+
+/*
+ * Glyph-shaped glass (GlassText): the character's own outline is the glass
+ * boundary. Both layers are clipped by mask images rasterised from the glyph
+ * (`--ngs-shape-mask` = coverage, `--ngs-shape-ring` = outline band), so the
+ * tint, the refraction, the rim light and the pointer glint all land on the
+ * glyph. The tile box has no corners and casts no shadow of its own.
+ */
+.ngs-surface[data-ngs-shape='glyph'] {
+  box-shadow: none;
+}
+
+.ngs-surface[data-ngs-shape='glyph'] .ngs-effect,
+.ngs-surface[data-ngs-shape='glyph'] .ngs-highlight {
+  border-radius: 0;
+  /* Shorthand so the base `mask-composite: exclude` cannot leak through. */
+  -webkit-mask: var(--ngs-shape-mask) center / 100% 100% no-repeat;
+  mask: var(--ngs-shape-mask) center / 100% 100% no-repeat;
+}
+
+/* The material is inherited unchanged. Only the geometry of its masks changes. */
+.ngs-surface[data-ngs-shape='glyph'] .ngs-highlight {
+  box-shadow: none;
+}
+
+.ngs-surface[data-ngs-shape='glyph'] .ngs-highlight::before {
+  padding: 0;
+  -webkit-mask: var(--ngs-shape-ring) center / 100% 100% no-repeat;
+  mask: var(--ngs-shape-ring) center / 100% 100% no-repeat;
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+
+.ngs-surface[data-ngs-shape='glyph'] .ngs-highlight::after {
+  padding: 0;
+  -webkit-mask: var(--ngs-shape-glint) center / 100% 100% no-repeat;
+  mask: var(--ngs-shape-glint) center / 100% 100% no-repeat;
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}

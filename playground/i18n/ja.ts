@@ -212,6 +212,19 @@ export const ja = {
   'overlay.modal.body':
     'モーダルの内容も右のパネルで制御されます。質感・屈折・ハイライト・角丸がリアルタイムで反映されます。',
 
+  'text.label.material': '同じ材質の比較',
+  'text.grid': '高コントラストのグリッド',
+  'text.ascii': '表示可能な ASCII 全95文字（␠ は空白）',
+  'text.title': 'GlassText',
+  'text.description': '字形そのものがガラス：輪郭が背景を屈折させ、縁にハイライトが走る',
+  'text.label.lockscreen': 'ロック画面クロック',
+  'text.label.input': '文字入力',
+  'text.date': '9月21日 月曜日',
+  'text.hint': '数字を上下にドラッグでサイズ変更',
+  'text.inputPlaceholder': '1〜4 文字を入力',
+  'text.inputAria': 'ガラス字形プレビューの文字',
+  'text.inputHint': '表示可能な ASCII（0x20–0x7E）は最大 {max} 文字 · 入力 {count}',
+
   'feed.logo': 'Weibo',
   'feed.search': '話題を検索：都市夜間飛行ノート',
   'feed.forward': 'リポスト',

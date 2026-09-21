@@ -57,6 +57,24 @@ export interface GlassFilterSpec {
   dispersion: number;
 }
 
+/**
+ * Prebuilt displacement map, used instead of `generateLensMap` when the shape
+ * is not a rounded rectangle (e.g. a glyph tile rasterised by `GlassText`).
+ * `key` must identify the whole map (character + font + geometry + optics) so
+ * identical tiles still share one filter node; blur/saturation/brightness/
+ * dispersion and the filter graph assembly are reused unchanged.
+ */
+export interface GlassFilterPreset {
+  key: string;
+  /** Displacement map PNG data URL. */
+  url: string;
+  /** Base feDisplacementMap scale (px). */
+  scale: number;
+  /** Map/element box, CSS px. */
+  width: number;
+  height: number;
+}
+
 interface RegistryEntry {
   id: string;
   mapUrl: string;
@@ -350,8 +368,10 @@ export interface UseGlassFilterOptions {
   enabled: boolean;
   /** true = share filter across identical geometry (Medium); false = private (High). */
   shared: boolean;
-  /** Lens geometry + material params (optics-resolved). */
+  /** Lens geometry + material params (optics-resolved). Ignored with `preset`. */
   map: Omit<LensMapOptions, 'skipDataUrl'>;
+  /** Prebuilt displacement map (glyph tiles); skips `generateLensMap`. */
+  preset?: GlassFilterPreset;
   /** Backdrop blur radius in px applied inside the graph (sigma = blur/2). */
   blur: number;
   /** Percent. */
@@ -381,22 +401,44 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   const filterIdRef = useRef<string | null>(null);
   filterIdRef.current = filterId;
 
-  const { enabled, shared, map, blur, saturation, brightness, animateBrightness, dispersion } = opts;
+  const { enabled, shared, map, preset, blur, saturation, brightness, animateBrightness, dispersion } =
+    opts;
   const { width, height, radius, edge, curvature, strength, dpr, rasterScale } = map;
+  const presetKey = preset?.key;
+  const presetUrl = preset?.url;
+  const presetScale = preset?.scale;
+  const presetWidth = preset?.width;
+  const presetHeight = preset?.height;
 
   useEffect(() => {
-    if (!registry || !enabled || width < 2 || height < 2) {
+    // A preset carries its own box: glyph tiles know their raster box up front
+    // and must not wait for the ResizeObserver.
+    const filterWidth = presetWidth ?? width;
+    const filterHeight = presetHeight ?? height;
+    if (!registry || !enabled || filterWidth < 2 || filterHeight < 2) {
       setFilterId(null);
       return;
     }
     let id: string | null = null;
     try {
-      const generated = generateLensMap({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
-      if (!generated.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
-      const baseScale = generated.maxScale;
+      let mapUrl: string;
+      let baseScale: number;
+      let shapeKey: string;
+      if (presetKey !== undefined && presetUrl !== undefined) {
+        if (!presetUrl) throw new Error('nico-glass-kit: glyph lens map rasterisation unavailable');
+        mapUrl = presetUrl;
+        baseScale = presetScale ?? 0;
+        shapeKey = presetKey;
+      } else {
+        const generated = generateLensMap({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
+        if (!generated.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
+        mapUrl = generated.dataUrl;
+        baseScale = generated.maxScale;
+        shapeKey = lensMapCacheKey({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
+      }
       baseScaleRef.current = baseScale;
       const key = [
-        lensMapCacheKey({ width, height, radius, edge, curvature, strength, dpr, rasterScale }),
+        shapeKey,
         `b${blur}`,
         `sat${saturation}`,
         `br${brightness}`,
@@ -407,9 +449,9 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
       ].join('|');
       id = registry.acquire({
         key,
-        width,
-        height,
-        mapUrl: generated.dataUrl,
+        width: filterWidth,
+        height: filterHeight,
+        mapUrl,
         scale: baseScale,
         blur,
         saturation,
@@ -429,6 +471,11 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     registry,
     enabled,
     shared,
+    presetKey,
+    presetUrl,
+    presetScale,
+    presetWidth,
+    presetHeight,
     width,
     height,
     radius,
