@@ -216,9 +216,6 @@ export const en = {
   'overlay.modal.body':
     'The modal body is driven by the right-hand panel too: material, refraction, highlight and radius update live.',
 
-  'text.label.material': 'Same material comparison',
-  'text.grid': 'High-contrast grid',
-  'text.ascii': 'All 95 printable ASCII characters (␠ marks space)',
   'text.title': 'GlassText',
   'text.description':
     'Text whose glyphs are the glass itself: the outline refracts the backdrop and carries a rim light',

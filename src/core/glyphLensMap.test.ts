@@ -233,6 +233,20 @@ describe('computeGlyphLensPixels', () => {
 });
 
 describe('glyphRingAlpha', () => {
+  it('feathers from the contour into the glyph without painting outside', () => {
+    const distances = new Float32Array([0.5, -0.5, -1.5, -2.5, -3.5]);
+    const ring = glyphRingAlpha(distances, 5, 1, 3, true);
+    expect(Array.from(ring)).toEqual([0, 236, 128, 19, 0]);
+    expect(Array.from(glyphRingAlpha(distances, 5, 1, 0, true))).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it('keeps the feather profile in CSS units across DPRs', () => {
+    const cssDistances = [-0.25, -0.75, -1.25, -2.75];
+    const atOne = glyphRingAlpha(new Float32Array(cssDistances), 4, 1, 3, true);
+    const atTwo = glyphRingAlpha(new Float32Array(cssDistances.map(d => d * 2)), 4, 1, 6, true);
+    expect(atTwo).toEqual(atOne);
+  });
+
   it('separates the 1px static border from the 2px pointer glint', () => {
     const sdf = signedDistanceField(solid(20, 20), 20, 20);
     const border = glyphRingAlpha(sdf, 20, 20, 1);

@@ -30,10 +30,8 @@ export const GLYPH_RASTER_CACHE_LIMIT = 128;
 /** Ink padding (CSS px) around every glyph tile: room for the ring band. */
 export const GLYPH_TILE_PADDING = 3;
 
-/**
- * Inner border widths in CSS px, matching GlassSurface's pseudo-elements.
- */
-export const DEFAULT_GLYPH_RING_WIDTH = 1;
+/** Static rim fades into the glyph over 3 CSS px; the pointer glint stays 2px. */
+export const DEFAULT_GLYPH_RING_WIDTH = 4;
 export const GLYPH_GLINT_WIDTH = 2;
 
 /**
@@ -333,19 +331,26 @@ export function computeGlyphLensPixels(
 }
 
 /**
- * Inner outline band with a pixel-wide antialias transition. Coverage clips
- * its outer edge, so a width of 1 really paints one pixel, not a thick halo.
+ * Inner outline band. Feathered bands fade smoothly from the contour to zero
+ * at ringWidthPx inside the glyph; hard bands retain a pixel-wide transition.
+ * Coverage clips the outer edge, including the edges of character holes.
  */
 export function glyphRingAlpha(
   sdf: Float32Array,
   width: number,
   height: number,
   ringWidthPx: number,
+  feather = false,
 ): Uint8ClampedArray {
   const alpha = new Uint8ClampedArray(width * height);
   const ring = Math.max(0, ringWidthPx);
+  if (ring === 0) return alpha;
   for (let i = 0; i < alpha.length; i++) {
-    alpha[i] = sdf[i] < 0 ? Math.round(clamp(ring + sdf[i] + 0.5, 0, 1) * 255) : 0;
+    if (sdf[i] >= 0) continue;
+    const t = clamp(1 + sdf[i] / ring, 0, 1);
+    alpha[i] = Math.round((feather
+      ? t * t * (3 - 2 * t)
+      : clamp(ring + sdf[i] + 0.5, 0, 1)) * 255);
   }
   return alpha;
 }
@@ -726,6 +731,7 @@ function rasteriseGlyph(options: GlyphRasterOptions): Omit<GlyphRaster, 'key'> |
     pixelWidth,
     pixelHeight,
     Math.max(0, options.ringWidth ?? DEFAULT_GLYPH_RING_WIDTH) * quality,
+    true,
   );
   const glint = glyphRingAlpha(lens.sdf, pixelWidth, pixelHeight, GLYPH_GLINT_WIDTH * quality);
   const rasterScale = clampLensMapRasterScale(

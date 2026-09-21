@@ -212,9 +212,6 @@ export const ja = {
   'overlay.modal.body':
     'モーダルの内容も右のパネルで制御されます。質感・屈折・ハイライト・角丸がリアルタイムで反映されます。',
 
-  'text.label.material': '同じ材質の比較',
-  'text.grid': '高コントラストのグリッド',
-  'text.ascii': '表示可能な ASCII 全95文字（␠ は空白）',
   'text.title': 'GlassText',
   'text.description': '字形そのものがガラス：輪郭が背景を屈折させ、縁にハイライトが走る',
   'text.label.lockscreen': 'ロック画面クロック',

@@ -1,4 +1,4 @@
-/* GlassText demo: lockscreen clock + full ASCII sheet. */
+/* GlassText demo: lockscreen clock + editable character preview. */
 
 /* The lockscreen has no panel of its own: the glass glyphs sit directly on
    the wallpaper, like the real thing. */
@@ -45,10 +45,11 @@
 }
 
 .demo-glyphs {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 32px;
+  row-gap: 14px;
 }
 
 .demo-glyphs-input {
@@ -59,63 +60,22 @@
 .demo-glyphs-preview {
   display: flex;
   align-items: center;
-  min-height: 118px;
+  min-width: 0;
+  min-height: 232px;
 }
 
 .demo-glyphs-note {
+  grid-column: 1 / -1;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.42);
 }
 
-.demo-text-samples {
-  width: 100%;
-  min-width: 0;
-}
+@media (max-width: 640px) {
+  .demo-glyphs {
+    grid-template-columns: 1fr;
+  }
 
-.demo-text-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.demo-text-stage {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 24px 36px;
-  padding: 28px;
-  border-radius: 20px;
-  margin-bottom: 24px;
-}
-
-.demo-text-stage-grid {
-  background-color: #172b49;
-  background-image:
-    linear-gradient(#eee9 1px, transparent 1px),
-    linear-gradient(90deg, #eee9 1px, transparent 1px);
-  background-size: 16px 16px;
-}
-
-.demo-text-reference {
-  width: 100%;
-  height: 64px;
-  text-align: center;
-  line-height: 64px;
-}
-
-.demo-ascii-sheet > div {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.demo-ascii-sheet code {
-  white-space: pre;
-  font-size: 12px;
-}
-
-.demo-text-samples {
-  max-width: 100%;
+  .demo-glyphs-note {
+    grid-column: auto;
+  }
 }

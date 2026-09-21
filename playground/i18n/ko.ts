@@ -213,9 +213,6 @@ export const ko = {
   'overlay.modal.body':
     '모달 내용도 오른쪽 패널로 제어됩니다. 재질, 굴절, 하이라이트, 모서리 반경이 실시간으로 반영됩니다.',
 
-  'text.label.material': '동일 재질 비교',
-  'text.grid': '고대비 격자',
-  'text.ascii': '표시 가능한 ASCII 95자 (␠는 공백)',
   'text.title': 'GlassText',
   'text.description':
     '글리프 자체가 유리: 외곽선이 배경을 굴절시키고 가장자리에 하이라이트가 흐른다',

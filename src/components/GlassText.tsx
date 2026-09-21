@@ -87,8 +87,8 @@ function normaliseText(text: string): string {
  * are ready the text is clipped away (it stays in the accessibility tree) and
  * the glass tiles take over.
  *
- * `elasticity` defaults to 0: a per-tile spring would let the glyphs drift
- * apart. It is still honoured when set explicitly.
+ * `elasticity` is passed through to each GlassSurface tile. When omitted,
+ * GlassSurface owns the default, just like every other glass component.
  *
  * Material parameters are passed through unchanged. Only the surface
  * geometry differs from other GlassSurface components.
@@ -108,7 +108,7 @@ export function GlassText(props: GlassTextProps) {
     quality,
     overLight,
     optics,
-    elasticity = 0,
+    elasticity,
     highlightIntensity,
     hoverBrightnessBoost,
     ...rest

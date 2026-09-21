@@ -205,9 +205,6 @@ export const zh = {
   'overlay.modal.create': '创建',
   'overlay.modal.body': '弹窗内容同样由右侧面板控制：材质、折射、高光与圆角实时生效。',
 
-  'text.label.material': '同材质对照',
-  'text.grid': '高对比网格',
-  'text.ascii': '全部 95 个可显示 ASCII 字符（␠ 表示空格）',
   'text.title': 'GlassText',
   'text.description': '玻璃字形文本：字形轮廓本身就是玻璃，背景沿笔画折射，轮廓上带一圈高光',
   'text.label.lockscreen': '锁屏时钟',

@@ -41,3 +41,9 @@
 .ngs-text .ngs-text-tile {
   position: absolute;
 }
+
+/* Give the feathered rim a gentle, light/dark-aware contrast base.
+   The shared gradient, hover fade and highlightIntensity still apply. */
+.ngs-text .ngs-text-tile[data-ngs-shape='glyph'] .ngs-highlight::before {
+  background-color: color-mix(in srgb, var(--ngs-text) 25%, transparent);
+}
