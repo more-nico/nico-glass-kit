@@ -218,9 +218,9 @@ export const ja = {
   'text.label.input': '文字入力',
   'text.date': '9月21日 月曜日',
   'text.hint': '数字を上下にドラッグでサイズ変更',
-  'text.inputPlaceholder': '1〜4 文字を入力',
+  'text.inputPlaceholder': '最大 {max} 文字を入力',
   'text.inputAria': 'ガラス字形プレビューの文字',
-  'text.inputHint': '表示可能な ASCII（0x20–0x7E）は最大 {max} 文字 · 入力 {count}',
+  'text.inputHint': '{count} / {max} 文字',
 
   'feed.logo': 'Weibo',
   'feed.search': '話題を検索：都市夜間飛行ノート',

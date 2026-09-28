@@ -14,6 +14,13 @@ import { useGlassQuality, type GlassQuality } from './useGlassQuality';
 import { useOverLight, type OverLight } from './useOverLight';
 import { useGlassFilter, type GlassFilterPreset } from './SvgFilterRegistry';
 import { GlassConfigContext } from './GlassProvider';
+import { GlassElasticityGroupContext } from './GlassElasticityGroup';
+import {
+  canAnimateElasticity,
+  elasticityTarget,
+  resolveElasticity,
+  type ElasticityPointer,
+} from './elasticityGroup';
 import { DEFAULT_OPTICS, resolveOptics, type GlassOptics } from './optics';
 
 /**
@@ -130,6 +137,9 @@ export function GlassSurface(props: GlassSurfaceProps) {
 
   const resolvedQuality = useGlassQuality(quality);
   const provider = useContext(GlassConfigContext);
+  const elasticityGroup = useContext(GlassElasticityGroupContext);
+  const groupRegister = elasticityGroup?.register;
+  const resolvedElasticity = resolveElasticity(elasticity, elasticityGroup?.elasticity);
   const containerRef = useRef<HTMLElement | null>(null);
   const light = useOverLight(overLight, containerRef);
   const material = useMemo(() => resolveOptics(DEFAULT_OPTICS, optics), [optics]);
@@ -260,53 +270,76 @@ export function GlassSurface(props: GlassSurfaceProps) {
     const el = containerRef.current;
     const motion = motionRef.current;
     if (!el || !motion) return;
-    if (resolvedQuality !== 'high' || !filterId || elasticity <= 0) return;
 
     const base = baseScaleRef.current;
-    const state: SpringState = {
-      scale: base,
-      tx: 0,
-      ty: 0,
-      vs: 0,
-      vtx: 0,
-      vty: 0,
-      targetScale: base,
-      targetTx: 0,
-      targetTy: 0,
-      raf: 0,
-    };
-    springRef.current = state;
+    const canAnimate = canAnimateElasticity(resolvedQuality, !!filterId, resolvedElasticity);
+    let state: SpringState | null = null;
+    let start: () => void = () => {};
 
-    const apply = () => {
-      setFilterScale(state.scale);
-      motion.style.transform = `translate3d(${state.tx.toFixed(2)}px, ${state.ty.toFixed(2)}px, 0)`;
-    };
-
-    const tick = () => {
-      const k = 180; // stiffness
-      const c = 20; // damping
-      const dt = 1 / 60;
-      let active = false;
-      const step = (
-        cur: number,
-        vel: number,
-        target: number,
-      ): [number, number] => {
-        const acc = k * (target - cur) - c * vel;
-        vel += acc * dt;
-        cur += vel * dt;
-        if (Math.abs(target - cur) > 0.01 || Math.abs(vel) > 0.01) active = true;
-        return [cur, vel];
+    if (canAnimate) {
+      state = {
+        scale: base,
+        tx: 0,
+        ty: 0,
+        vs: 0,
+        vtx: 0,
+        vty: 0,
+        targetScale: base,
+        targetTx: 0,
+        targetTy: 0,
+        raf: 0,
       };
-      [state.scale, state.vs] = step(state.scale, state.vs, state.targetScale);
-      [state.tx, state.vtx] = step(state.tx, state.vtx, state.targetTx);
-      [state.ty, state.vty] = step(state.ty, state.vty, state.targetTy);
-      apply();
-      state.raf = active ? requestAnimationFrame(tick) : 0;
-    };
+      springRef.current = state;
 
-    const start = () => {
-      if (!state.raf) state.raf = requestAnimationFrame(tick);
+      const apply = () => {
+        if (!state) return;
+        setFilterScale(state.scale);
+        motion.style.transform = `translate3d(${state.tx.toFixed(2)}px, ${state.ty.toFixed(2)}px, 0)`;
+      };
+
+      const tick = () => {
+        if (!state) return;
+        const k = 180; // stiffness
+        const c = 20; // damping
+        const dt = 1 / 60;
+        let active = false;
+        const step = (
+          cur: number,
+          vel: number,
+          target: number,
+        ): [number, number] => {
+          const acc = k * (target - cur) - c * vel;
+          vel += acc * dt;
+          cur += vel * dt;
+          if (Math.abs(target - cur) > 0.01 || Math.abs(vel) > 0.01) active = true;
+          return [cur, vel];
+        };
+        [state.scale, state.vs] = step(state.scale, state.vs, state.targetScale);
+        [state.tx, state.vtx] = step(state.tx, state.vtx, state.targetTx);
+        [state.ty, state.vty] = step(state.ty, state.vty, state.targetTy);
+        apply();
+        state.raf = active ? requestAnimationFrame(tick) : 0;
+      };
+
+      start = () => {
+        if (state && !state.raf) state.raf = requestAnimationFrame(tick);
+      };
+    }
+
+    const setPointer = (pointer: ElasticityPointer | null) => {
+      if (!state) return;
+      if (!pointer) {
+        state.targetScale = base;
+        state.targetTx = 0;
+        state.targetTy = 0;
+        start();
+        return;
+      }
+      const target = elasticityTarget(base, resolvedElasticity, pointer);
+      state.targetScale = target.scale;
+      state.targetTx = target.tx;
+      state.targetTy = target.ty;
+      start();
     };
 
     const onMove = (e: PointerEvent) => {
@@ -314,32 +347,31 @@ export function GlassSurface(props: GlassSurfaceProps) {
       if (rect.width === 0 || rect.height === 0) return;
       const nx = (e.clientX - (rect.left + rect.width / 2)) / rect.width; // -0.5..0.5
       const ny = (e.clientY - (rect.top + rect.height / 2)) / rect.height;
-      const dist = Math.min(1, Math.hypot(nx, ny) * 2);
-      state.targetScale = base * (1 + elasticity * 0.5 * (1 - dist * 0.6));
-      state.targetTx = nx * elasticity * 24;
-      state.targetTy = ny * elasticity * 24;
-      start();
+      setPointer({ nx, ny, distance: Math.min(1, Math.hypot(nx, ny) * 2) });
     };
-    const onLeave = () => {
-      state.targetScale = base;
-      state.targetTx = 0;
-      state.targetTy = 0;
-      start();
-    };
+    const onLeave = () => setPointer(null);
+    const unregister = groupRegister?.(el, setPointer);
+    if (!groupRegister && canAnimate) {
+      el.addEventListener('pointermove', onMove);
+      el.addEventListener('pointerleave', onLeave);
+      el.addEventListener('pointercancel', onLeave);
+    }
 
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerleave', onLeave);
-    el.addEventListener('pointercancel', onLeave);
     return () => {
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerleave', onLeave);
-      el.removeEventListener('pointercancel', onLeave);
-      if (state.raf) cancelAnimationFrame(state.raf);
-      motion.style.transform = '';
-      setFilterScale(base);
-      springRef.current = null;
+      unregister?.();
+      if (!groupRegister && canAnimate) {
+        el.removeEventListener('pointermove', onMove);
+        el.removeEventListener('pointerleave', onLeave);
+        el.removeEventListener('pointercancel', onLeave);
+      }
+      if (state) {
+        if (state.raf) cancelAnimationFrame(state.raf);
+        motion.style.transform = '';
+        setFilterScale(base);
+        if (springRef.current === state) springRef.current = null;
+      }
     };
-  }, [resolvedQuality, filterId, elasticity, baseScaleRef, setFilterScale]);
+  }, [resolvedQuality, filterId, resolvedElasticity, groupRegister, baseScaleRef, setFilterScale]);
 
   // Directional rim light (all tiers, pure CSS vars): the specular glint
   // tracks the pointer; fades back to a uniform rim when the pointer leaves.
@@ -407,6 +439,11 @@ export function GlassSurface(props: GlassSurfaceProps) {
     // A glyph has no corners and no box to cast a shadow from.
     borderRadius: glyph ? 0 : cornerRadius,
     '--ngs-hl': highlightIntensity,
+    // CSS tokens resolve Auto per surface and still allow component styles
+    // (e.g. invalid inputs) to override the public tint variables. Reset the
+    // material tint for Auto so nested surfaces do not inherit a parent's dye.
+    '--ngs-material-tint': material.tint === DEFAULT_OPTICS.tint ? 'initial' : material.tint,
+    '--ngs-material-tint-strength': material.tintStrength,
     ...(glyph
       ? {
           '--ngs-shape-mask': `url("${glyph.maskUrl}")`,

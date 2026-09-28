@@ -224,10 +224,10 @@ export const ru = {
   'text.label.input': 'Ввод символов',
   'text.date': 'понедельник, 21 сентября',
   'text.hint': 'Тяни цифры вверх/вниз, чтобы изменить размер',
-  'text.inputPlaceholder': 'Введите 1–4 символа',
+  'text.inputPlaceholder': 'Введите до {max} символов',
   'text.inputAria': 'Символы для предпросмотра глифов',
   'text.inputHint':
-    'До {max} печатных символов ASCII (0x20–0x7E) · введено {count}',
+    '{count} / {max} символов',
 
   'feed.logo': 'Вэйбо',
   'feed.search': 'В трендах: «Записки ночного города»',

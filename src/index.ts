@@ -10,6 +10,9 @@ export type { GlassSurfaceProps, GlassGlyphShape } from './core/GlassSurface';
 export { GlassLightGroup } from './core/GlassLightGroup';
 export type { GlassLightGroupProps } from './core/GlassLightGroup';
 
+export { GlassElasticityGroup } from './core/GlassElasticityGroup';
+export type { GlassElasticityGroupProps } from './core/GlassElasticityGroup';
+
 export { useGlassQuality } from './core/useGlassQuality';
 export type { GlassQuality } from './core/useGlassQuality';
 export { useOverLight } from './core/useOverLight';

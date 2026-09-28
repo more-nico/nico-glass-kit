@@ -211,9 +211,9 @@ export const zh = {
   'text.label.input': '字符输入',
   'text.date': '9月21日 星期一',
   'text.hint': '上下拖动数字改字号',
-  'text.inputPlaceholder': '输入 1–4 个字符',
+  'text.inputPlaceholder': '输入最多 {max} 个字符',
   'text.inputAria': '玻璃字形预览字符',
-  'text.inputHint': '最多 {max} 个可显示 ASCII 字符（0x20–0x7E） · 已输入 {count}',
+  'text.inputHint': '{count} / {max} 个字符',
 
   'feed.logo': '微博',
   'feed.search': '大家正在搜：城市夜航手记',

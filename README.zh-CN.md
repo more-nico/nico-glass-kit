@@ -28,6 +28,7 @@
 - [快速开始](#快速开始)
 - [渲染分档](#渲染分档)
 - [明暗处理](#明暗处理)
+- [弹性分组](#弹性分组)
 - [组件](#组件)
 - [Playground](#playground)
 - [组件演示](#组件演示)
@@ -47,6 +48,7 @@
 - **分档渲染，自动降级。** 按浏览器实际能力在 `high → medium → low` 之间选择；不支持 `backdrop-filter: url()` 的浏览器拿到一套普通 CSS 背景链，而不是坏掉的表面。
 - **逐元素明暗自适应。** `overLight="auto"` 采样每个表面下方实际绘制的像素亮度，单独翻转该元素的文字、染色、边缘与阴影，并带迟滞，不会来回跳变。
 - **`GlassLightGroup`。** 把若干 auto 元素绑成一个识别组，让一整行或整条悬浮栏只做一个明暗判断，而不是逐片闪烁。
+- **`GlassElasticityGroup`。** 让多个玻璃表面共享一组指针位置和弹性强度，像锁屏时钟这样的多字形表面可以一起形变；它与 `GlassLightGroup` 独立组合。
 - **SSR 安全。** 模块顶层不碰 `window`/`document`；首次客户端渲染固定为 low 档加深色回退，挂载后再升级。
 - **18 个成品组件**跑在同一个基元上，接受同一套材质参数。
 
@@ -115,6 +117,18 @@ export function Demo() {
 
 相邻元素需要保持一致时（一行工具栏、一条底栏、页脚），把它们放进 `GlassLightGroup`，整条一起翻转。
 
+## 弹性分组
+
+把需要联动的玻璃表面放进 `GlassElasticityGroup`，它们会沿组边界共享指针驱动；组边界内的成员间隙也会触发形变。分组的 `elasticity`（默认 `0.2`）覆盖成员各自的值，弹簧仍只在 `high` 档运行。弹性分组和明暗分组相互独立，可以同时使用。
+
+```tsx
+import { GlassElasticityGroup, GlassText } from 'nico-glass-kit';
+
+<GlassElasticityGroup elasticity={0.35}>
+  <GlassText text="10:09" fontSize={160} />
+</GlassElasticityGroup>
+```
+
 ## 组件
 
 ### 基元
@@ -124,6 +138,7 @@ export function Demo() {
 | [`GlassSurface`](src/core/GlassSurface.tsx) | 基元组件：分层结构、材质、探测与弹性都在这里。 |
 | [`GlassProvider`](src/core/GlassProvider.tsx) | 全局默认值 + SVG 滤镜注册表。 |
 | [`GlassLightGroup`](src/core/GlassLightGroup.tsx) | 让绑定的多个元素共享一次明暗判断。 |
+| [`GlassElasticityGroup`](src/core/GlassElasticityGroup.tsx) | 让绑定的多个元素共享指针驱动的弹簧。 |
 
 ### 按钮与导航
 

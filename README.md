@@ -28,6 +28,7 @@
 - [Quick start](#quick-start)
 - [Rendering tiers](#rendering-tiers)
 - [Light and dark](#light-and-dark)
+- [Elasticity groups](#elasticity-groups)
 - [Components](#components)
 - [Playground](#playground)
 - [Component gallery](#component-gallery)
@@ -62,6 +63,9 @@ as plain TypeScript + CSS.
 - **`GlassLightGroup`.** Binds several auto elements into one recognition group,
   so a row or a floating bar resolves a single decision instead of flickering
   element by element.
+- **`GlassElasticityGroup`.** Drives several glass surfaces from one shared
+  pointer field and elasticity strength, so a multi-surface element such as a
+  glyph clock deforms together. It composes independently with `GlassLightGroup`.
 - **SSR-safe.** No `window`/`document` at module scope; the first client render
   is always the low tier with a dark fallback, and upgrades in an effect.
 - **18 ready-made components** built on one primitive, all accepting the same
@@ -142,6 +146,22 @@ degrades it down the chain when the browser cannot run it.
 Wrap neighbouring auto elements in `GlassLightGroup` when they should agree —
 a toolbar row, a tab bar, a footer — so the whole strip flips at once.
 
+## Elasticity groups
+
+Wrap related glass surfaces in `GlassElasticityGroup` to make them follow one
+pointer field across the group's bounding rectangle. The group-level
+`elasticity` (default `0.2`) overrides member values; the spring still runs
+only on the high tier. Elasticity and light/dark recognition groups are
+independent and can wrap the same surfaces.
+
+```tsx
+import { GlassElasticityGroup, GlassText } from 'nico-glass-kit';
+
+<GlassElasticityGroup elasticity={0.35}>
+  <GlassText text="10:09" fontSize={160} />
+</GlassElasticityGroup>
+```
+
 ## Components
 
 ### Core
@@ -151,6 +171,7 @@ a toolbar row, a tab bar, a footer — so the whole strip flips at once.
 | [`GlassSurface`](src/core/GlassSurface.tsx) | The primitive every other component wraps: layer stack, optics, probing, elasticity. |
 | [`GlassProvider`](src/core/GlassProvider.tsx) | Global defaults plus the SVG filter registry. |
 | [`GlassLightGroup`](src/core/GlassLightGroup.tsx) | Shares one light/dark decision across bound elements. |
+| [`GlassElasticityGroup`](src/core/GlassElasticityGroup.tsx) | Shares one pointer-driven spring across bound elements. |
 
 ### Buttons & navigation
 

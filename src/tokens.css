@@ -69,9 +69,16 @@
   --ngs-tint-fallback: rgba(26, 28, 38, 0.88);
 }
 
+/* Per-surface material parameters feed the public tokens; more specific
+   component styles and inline public token overrides keep their precedence. */
+.ngs-surface {
+  --ngs-glass-tint: var(--ngs-material-tint, rgb(18 20 26));
+  --ngs-glass-tint-strength: var(--ngs-material-tint-strength, 0.2);
+}
+
 /* over-light token set */
 .ngs-surface[data-ngs-light='true'] {
-  --ngs-glass-tint: rgb(255 255 255);
+  --ngs-glass-tint: var(--ngs-material-tint, rgb(255 255 255));
   --ngs-tint-hover: rgba(0, 0, 0, 0.1);
   --ngs-active-bg: rgba(255, 255, 255, 0.66);
   --ngs-text: rgba(10, 12, 20, 0.88);

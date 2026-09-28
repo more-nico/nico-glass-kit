@@ -223,10 +223,10 @@ export const en = {
   'text.label.input': 'Character input',
   'text.date': 'Monday, September 21',
   'text.hint': 'Drag the digits up/down to resize',
-  'text.inputPlaceholder': 'Type 1–4 characters',
+  'text.inputPlaceholder': 'Type up to {max} characters',
   'text.inputAria': 'Glass glyph preview characters',
   'text.inputHint':
-    'Up to {max} displayable ASCII characters (0x20–0x7E) · {count} used',
+    '{count} / {max} characters',
 
   'feed.logo': 'Weibo',
   'feed.search': 'Trending: City Night Flight Notes',

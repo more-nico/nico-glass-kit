@@ -1,11 +1,18 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { GlassButton, GlassInput, GlassLightGroup, GlassText } from 'nico-glass-kit';
+import {
+  GlassButton,
+  GlassElasticityGroup,
+  GlassInput,
+  GlassLightGroup,
+  GlassText,
+} from 'nico-glass-kit';
 import type { DemoParams } from '../App';
 import { useI18n } from '../i18n';
 import { DemoSection } from './DemoSection';
@@ -19,22 +26,27 @@ const DRAG_SCALE = 0.7;
 const LARGE_TEXT_SIZE = 192;
 const TEXT_FONT_FAMILY = '"Segoe UI Variable", "Segoe UI", sans-serif';
 const LETTER_FONT_FAMILY = '"Palatino Linotype", serif';
+const CHINESE_FONT_FAMILY = '"Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif';
+const JAPANESE_FONT_FAMILY = '"Noto Serif JP", "Yu Mincho", "Noto Serif SC", serif';
 
-/** The preview field accepts at most this many displayable ASCII characters. */
-const MAX_CHARS = 4;
+/** The preview field accepts at most this many characters. */
+const MAX_CHARS = 10;
 
-/** Keeps `\r\n\t` as spaces and drops everything outside 0x20–0x7E. */
-function sanitiseAscii(value: string): string {
-  let out = '';
-  for (let i = 0; i < value.length && out.length < MAX_CHARS; i++) {
-    const code = value.charCodeAt(i);
-    if (code === 0x0d || code === 0x0a || code === 0x09) {
-      out += ' ';
-    } else if (code >= 0x20 && code <= 0x7e) {
-      out += value[i];
-    }
-  }
-  return out;
+type SegmenterConstructor = new (
+  locales: undefined,
+  options: { granularity: 'grapheme' },
+) => { segment: (value: string) => Iterable<{ segment: string }> };
+const Segmenter = (Intl as typeof Intl & { Segmenter?: SegmenterConstructor }).Segmenter;
+const characterSegmenter = Segmenter ? new Segmenter(undefined, { granularity: 'grapheme' }) : null;
+
+function characters(value: string): string[] {
+  return characterSegmenter
+    ? Array.from(characterSegmenter.segment(value), ({ segment }) => segment)
+    : Array.from(value);
+}
+
+function limitCharacters(value: string): string {
+  return characters(value).slice(0, MAX_CHARS).join('');
 }
 
 function formatClock(date: Date): string {
@@ -44,21 +56,29 @@ function formatClock(date: Date): string {
 }
 
 function renderMixedText(text: string, params: DemoParams) {
-  const runs: Array<{ text: string; fontFamily: string }> = [];
-  for (const char of text) {
-    const fontFamily = /[A-Za-z]/.test(char) ? LETTER_FONT_FAMILY : TEXT_FONT_FAMILY;
+  const chars = characters(text);
+  const previewSize = `clamp(20px, ${88 / Math.max(4, chars.length)}cqi, ${LARGE_TEXT_SIZE}px)`;
+  const runs: Array<{ text: string; fontFamily: string; fontWeight: number }> = [];
+  for (const char of chars) {
+    const fontFamily = /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(char)
+      ? JAPANESE_FONT_FAMILY
+      : /[\p{Script=Han}\u3000-\u303f\uff00-\uffef]/u.test(char)
+        ? CHINESE_FONT_FAMILY
+        : /[A-Za-z]/.test(char) ? LETTER_FONT_FAMILY : TEXT_FONT_FAMILY;
+    const fontWeight = fontFamily === CHINESE_FONT_FAMILY || fontFamily === JAPANESE_FONT_FAMILY
+      ? 500 : 600;
     const previous = runs[runs.length - 1];
     if (previous?.fontFamily === fontFamily) previous.text += char;
-    else runs.push({ text: char, fontFamily });
+    else runs.push({ text: char, fontFamily, fontWeight });
   }
 
   return runs.map((run, index) => (
     <GlassText
       key={`${index}-${run.fontFamily}`}
       text={run.text}
-      fontSize={LARGE_TEXT_SIZE}
+      fontSize={previewSize}
       fontFamily={run.fontFamily}
-      fontWeight={600}
+      fontWeight={run.fontWeight}
       tabularNums
       {...glassProps(params)}
     />
@@ -70,6 +90,8 @@ export function TextDemo({ params }: { params: DemoParams }) {
   const [now, setNow] = useState(() => new Date());
   const [fontSize, setFontSize] = useState(LARGE_TEXT_SIZE);
   const [glyphs, setGlyphs] = useState('Nico');
+  const composing = useRef(false);
+  const inputHintId = useId();
   const drag = useRef<{ pointerId: number; startY: number; startSize: number } | null>(null);
 
   useEffect(() => {
@@ -98,7 +120,8 @@ export function TextDemo({ params }: { params: DemoParams }) {
   };
 
   const onGlyphsChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setGlyphs(sanitiseAscii(event.target.value));
+    const value = event.target.value;
+    setGlyphs(composing.current ? value : limitCharacters(value));
   };
 
   return (
@@ -121,15 +144,17 @@ export function TextDemo({ params }: { params: DemoParams }) {
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
             >
-              <GlassText
-                text={formatClock(now)}
-                fontSize={fontSize}
-                fontFamily={TEXT_FONT_FAMILY}
-                fontWeight={600}
-                letterSpacing={-2}
-                tabularNums
-                {...glassProps(params)}
-              />
+              <GlassElasticityGroup elasticity={params.elasticity}>
+                <GlassText
+                  text={formatClock(now)}
+                  fontSize={fontSize}
+                  fontFamily={LETTER_FONT_FAMILY}
+                  fontWeight={600}
+                  letterSpacing={-2}
+                  tabularNums
+                  {...glassProps(params)}
+                />
+              </GlassElasticityGroup>
             </div>
             <span className="demo-lockscreen-hint">{t('text.hint')}</span>
             <div className="demo-clock-sizes">
@@ -152,26 +177,35 @@ export function TextDemo({ params }: { params: DemoParams }) {
           <span className="demo-label">{t('text.label.input')}</span>
           <div className="demo-glyphs">
             <GlassLightGroup>
-              <GlassInput
-                className="demo-glyphs-input"
-                size="md"
-                value={glyphs}
-                onChange={onGlyphsChange}
-                maxLength={MAX_CHARS}
-                spellCheck={false}
-                autoComplete="off"
-                placeholder={t('text.inputPlaceholder')}
-                aria-label={t('text.inputAria')}
-                {...glassProps(params)}
-                cornerRadius={params.cornerRadius}
-              />
+              <div className="demo-glyphs-toolbar">
+                <GlassInput
+                  className="demo-glyphs-input"
+                  size="md"
+                  value={glyphs}
+                  onChange={onGlyphsChange}
+                  onCompositionStart={() => { composing.current = true; }}
+                  onCompositionEnd={(event) => {
+                    composing.current = false;
+                    setGlyphs(limitCharacters(event.currentTarget.value));
+                  }}
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder={t('text.inputPlaceholder', { max: MAX_CHARS })}
+                  aria-label={t('text.inputAria')}
+                  aria-describedby={inputHintId}
+                  {...glassProps(params)}
+                  cornerRadius={params.cornerRadius}
+                />
+                <span className="demo-glyphs-note" id={inputHintId}>
+                  {t('text.inputHint', { count: characters(glyphs).length, max: MAX_CHARS })}
+                </span>
+              </div>
               <div className="demo-glyphs-preview">
-                {renderMixedText(glyphs, params)}
+                <div className="demo-glyphs-line">
+                  {renderMixedText(glyphs, params)}
+                </div>
               </div>
             </GlassLightGroup>
-            <span className="demo-glyphs-note">
-              {t('text.inputHint', { count: glyphs.length, max: MAX_CHARS })}
-            </span>
           </div>
         </div>
       </div>

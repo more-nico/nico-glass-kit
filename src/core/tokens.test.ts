@@ -19,12 +19,16 @@ describe('tokens.css optics defaults', () => {
     expect(LIGHT_DARK).toBeTruthy();
     const [, light, dark] = LIGHT_DARK!;
     expect(token('--ngs-glass-tint')).toBe(dark.trim());
+    expect(css).toContain(`--ngs-glass-tint: var(--ngs-material-tint, ${dark.trim()})`);
     const lightBlock = css.slice(css.indexOf("[data-ngs-light='true']"));
-    expect(lightBlock).toContain(`--ngs-glass-tint: ${light.trim()}`);
+    expect(lightBlock).toContain(`--ngs-glass-tint: var(--ngs-material-tint, ${light.trim()})`);
   });
 
   it('pins the tint strength to DEFAULT_OPTICS', () => {
     expect(token('--ngs-glass-tint-strength')).toBe(String(DEFAULT_OPTICS.tintStrength));
+    expect(css).toContain(
+      `--ngs-glass-tint-strength: var(--ngs-material-tint-strength, ${DEFAULT_OPTICS.tintStrength})`,
+    );
   });
 
   it('does not re-declare optics tokens that no CSS consumes', () => {

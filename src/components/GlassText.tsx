@@ -1,6 +1,7 @@
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -25,6 +26,11 @@ import {
   type GlyphLayout,
 } from '../core/glyphLensMap';
 import './GlassText.css';
+
+// Measure and rasterise before paint in the browser so text updates never
+// briefly reveal the plain-text fallback. Keep the passive effect on the
+// server to avoid the useLayoutEffect SSR warning.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export interface GlassTextProps extends HTMLAttributes<HTMLSpanElement>, GlassExtras {
   /**
@@ -136,7 +142,7 @@ export function GlassText(props: GlassTextProps) {
 
   // Canvas measurement + rasterisation. Re-runs when the font, the text, the
   // optics or the resolved font size (probe) change, and after every font load.
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const el = rootRef.current;
     if (!el || typeof document === 'undefined') return;
     let cancelled = false;

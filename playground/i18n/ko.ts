@@ -220,9 +220,9 @@ export const ko = {
   'text.label.input': '문자 입력',
   'text.date': '9월 21일 월요일',
   'text.hint': '숫자를 위아래로 드래그해 크기 변경',
-  'text.inputPlaceholder': '1–4자 입력',
+  'text.inputPlaceholder': '최대 {max}자 입력',
   'text.inputAria': '유리 글리프 미리보기 문자',
-  'text.inputHint': '표시 가능한 ASCII(0x20–0x7E) 최대 {max}자 · 입력 {count}',
+  'text.inputHint': '{count} / {max}자',
 
   'feed.logo': 'Weibo',
   'feed.search': '실시간 검색: 도시 야간 비행 노트',
