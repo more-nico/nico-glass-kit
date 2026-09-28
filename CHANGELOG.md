@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.3.2
+
+### Changed
+
+- Playground lock-screen clock uses the Nico font. The glyph preview accepts
+  up to ten Unicode characters with composition-safe input, serif CJK fonts,
+  a character counter and a responsive layout.
+
+### Fixed
+
+- Forward `optics.tint` and `optics.tintStrength` to the glass tint layer in
+  every rendering tier. Custom colours now apply while Auto still follows
+  each surface's light/dark decision and component tint overrides remain effective.
+- Rasterise `GlassText` before paint in the browser to avoid briefly showing
+  the plain-text fallback when text changes.
+
 ### Added
 
 - `GlassElasticityGroup`: gives descendant glass surfaces one shared pointer
@@ -9,6 +25,11 @@
   so multi-surface elements can deform together. Independent of
   `GlassLightGroup`; the playground lock-screen glyph clock demonstrates both
   contexts composed around its surfaces.
+
+## Earlier unreleased changes
+
+### Added
+
 - Playground interface languages: Chinese, English, Russian, Japanese and
   Korean, switchable from a segmented control in the top nav bar. Every string
   now comes from a typed dictionary (including the mock Weibo feed and the
@@ -66,9 +87,6 @@
 
 ### Fixed
 
-- Forward `optics.tint` and `optics.tintStrength` to the glass tint layer in
-  every rendering tier. Custom colours now apply while Auto still follows
-  each surface's light/dark decision and component tint overrides remain effective.
 - `GlassButton disabled` now actually renders the `disabled` attribute; the
   prop was consumed for the hover-brightness decision but never forwarded,
   so the disabled button stayed clickable and hover-styled.
