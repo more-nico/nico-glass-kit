@@ -22,6 +22,10 @@ import {
   type ElasticityPointer,
 } from './elasticityGroup';
 import { DEFAULT_OPTICS, resolveOptics, type GlassOptics } from './optics';
+import { observeResize } from './observeResize';
+import { subscribeSurfacePointer } from './surfacePointer';
+import { useGlassDpr } from './useGlassDpr';
+import { cancelGlassFrame, requestGlassFrame } from './animationFrame';
 
 /**
  * Prebuilt glyph tile (see `glyphLensMap.ts` / `GlassText`). When present the
@@ -162,7 +166,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     let timer: number | undefined;
-    const ro = new ResizeObserver(() => {
+    const unobserve = observeResize(el, () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         setSize((prev) => {
@@ -174,17 +178,13 @@ export function GlassSurface(props: GlassSurfaceProps) {
         });
       }, 100);
     });
-    ro.observe(el);
     return () => {
       window.clearTimeout(timer);
-      ro.disconnect();
+      unobserve();
     };
   }, []);
 
-  const dpr = useMemo(
-    () => (typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2)),
-    [],
-  );
+  const dpr = useGlassDpr();
 
   // A glyph tile is only a glyph when it has a real mask: an empty URL would
   // otherwise render as a rectangular glass block.
@@ -218,7 +218,8 @@ export function GlassSurface(props: GlassSurfaceProps) {
   // the boosted slopes to every element with identical geometry.
   const { filterId, baseScaleRef, setFilterScale, setFilterBrightness } = useGlassFilter({
     enabled: needsFilter,
-    shared: resolvedQuality === 'medium' && hoverBrightnessBoost <= 0,
+    shared: hoverBrightnessBoost <= 0 &&
+      (resolvedQuality === 'medium' || resolvedElasticity <= 0 || material.refraction === 0),
     map: {
       width: hasGlyph ? glyphWidth : size.width,
       height: hasGlyph ? glyphHeight : size.height,
@@ -291,10 +292,15 @@ export function GlassSurface(props: GlassSurfaceProps) {
       };
       springRef.current = state;
 
+      // CSSOM normalizes transform strings (0.00px -> 0px, 0 -> 0px).
+      // Comparing our last write avoids dirtying an unchanged transform.
+      let lastTransform = '';
+
       const apply = () => {
         if (!state) return;
         setFilterScale(state.scale);
-        motion.style.transform = `translate3d(${state.tx.toFixed(2)}px, ${state.ty.toFixed(2)}px, 0)`;
+        const transform = `translate3d(${state.tx.toFixed(2)}px, ${state.ty.toFixed(2)}px, 0)`;
+        if (lastTransform !== transform) { motion.style.transform = transform; lastTransform = transform; }
       };
 
       const tick = () => {
@@ -318,11 +324,11 @@ export function GlassSurface(props: GlassSurfaceProps) {
         [state.tx, state.vtx] = step(state.tx, state.vtx, state.targetTx);
         [state.ty, state.vty] = step(state.ty, state.vty, state.targetTy);
         apply();
-        state.raf = active ? requestAnimationFrame(tick) : 0;
+        state.raf = active ? requestGlassFrame(tick) : 0;
       };
 
       start = () => {
-        if (state && !state.raf) state.raf = requestAnimationFrame(tick);
+        if (state && !state.raf) state.raf = requestGlassFrame(tick);
       };
     }
 
@@ -342,30 +348,14 @@ export function GlassSurface(props: GlassSurfaceProps) {
       start();
     };
 
-    const onMove = (e: PointerEvent) => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      const nx = (e.clientX - (rect.left + rect.width / 2)) / rect.width; // -0.5..0.5
-      const ny = (e.clientY - (rect.top + rect.height / 2)) / rect.height;
-      setPointer({ nx, ny, distance: Math.min(1, Math.hypot(nx, ny) * 2) });
-    };
-    const onLeave = () => setPointer(null);
-    const unregister = groupRegister?.(el, setPointer);
-    if (!groupRegister && canAnimate) {
-      el.addEventListener('pointermove', onMove);
-      el.addEventListener('pointerleave', onLeave);
-      el.addEventListener('pointercancel', onLeave);
-    }
+    const unregister = canAnimate
+      ? groupRegister ? groupRegister(el, setPointer) : subscribeSurfacePointer(el, setPointer)
+      : undefined;
 
     return () => {
       unregister?.();
-      if (!groupRegister && canAnimate) {
-        el.removeEventListener('pointermove', onMove);
-        el.removeEventListener('pointerleave', onLeave);
-        el.removeEventListener('pointercancel', onLeave);
-      }
       if (state) {
-        if (state.raf) cancelAnimationFrame(state.raf);
+        if (state.raf) cancelGlassFrame(state.raf);
         motion.style.transform = '';
         setFilterScale(base);
         if (springRef.current === state) springRef.current = null;
@@ -383,43 +373,31 @@ export function GlassSurface(props: GlassSurfaceProps) {
     let raf = 0;
     let opacity = 0;
     let target = 0;
-    const setO = (o: number) => hl.style.setProperty('--ngs-spec-o', o.toFixed(3));
+    const setO = (o: number) => {
+      const value = o.toFixed(3);
+      if (hl.style.getPropertyValue('--ngs-spec-o') !== value) hl.style.setProperty('--ngs-spec-o', value);
+    };
     const tick = () => {
       opacity += (target - opacity) * 0.18;
       if (Math.abs(target - opacity) < 0.005) opacity = target;
       setO(opacity);
-      raf = opacity === target ? 0 : requestAnimationFrame(tick);
+      raf = opacity === target ? 0 : requestGlassFrame(tick);
     };
     const start = () => {
-      if (!raf) raf = requestAnimationFrame(tick);
+      if (!raf) raf = requestGlassFrame(tick);
     };
-    const onMove = (e: PointerEvent) => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      hl.style.setProperty(
-        '--ngx',
-        `${(((e.clientX - rect.left) / rect.width) * 100).toFixed(2)}%`,
-      );
-      hl.style.setProperty(
-        '--ngy',
-        `${(((e.clientY - rect.top) / rect.height) * 100).toFixed(2)}%`,
-      );
-      target = 1;
+    const unsubscribe = subscribeSurfacePointer(el, pointer => {
+      if (pointer) {
+        const x = `${pointer.x.toFixed(2)}%`, y = `${pointer.y.toFixed(2)}%`;
+        if (hl.style.getPropertyValue('--ngx') !== x) hl.style.setProperty('--ngx', x);
+        if (hl.style.getPropertyValue('--ngy') !== y) hl.style.setProperty('--ngy', y);
+      }
+      target = pointer ? 1 : 0;
       start();
-    };
-    const onLeave = () => {
-      target = 0;
-      start();
-    };
-
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerleave', onLeave);
-    el.addEventListener('pointercancel', onLeave);
+    });
     return () => {
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerleave', onLeave);
-      el.removeEventListener('pointercancel', onLeave);
-      if (raf) cancelAnimationFrame(raf);
+      unsubscribe();
+      if (raf) cancelGlassFrame(raf);
       hl.style.removeProperty('--ngs-spec-o');
       hl.style.removeProperty('--ngx');
       hl.style.removeProperty('--ngy');

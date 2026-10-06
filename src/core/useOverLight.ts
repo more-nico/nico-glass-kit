@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useSyncExternalStore } from 'react';
 import { GlassConfigContext } from './GlassProvider';
 import {
   GlassLightGroupLightContext,
@@ -9,20 +9,27 @@ import { useBackdropLight, type ElementRefLike } from './useBackdropLight';
 export type OverLight = boolean | 'auto';
 
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
+let lightQuery: MediaQueryList | null = null;
+const schemeListeners = new Set<() => void>();
+const readScheme = () => {
+  if (typeof window === 'undefined') return false;
+  lightQuery ??= window.matchMedia(LIGHT_QUERY);
+  return lightQuery.matches;
+};
+const notifyScheme = () => { for (const listener of schemeListeners) listener(); };
+const subscribeScheme = (listener: () => void) => {
+  readScheme();
+  if (!schemeListeners.size) lightQuery?.addEventListener('change', notifyScheme);
+  schemeListeners.add(listener);
+  return () => {
+    schemeListeners.delete(listener);
+    if (!schemeListeners.size) { lightQuery?.removeEventListener('change', notifyScheme); lightQuery = null; }
+  };
+};
 
 /** `prefers-color-scheme` fallback (the legacy `'auto'` behaviour). */
 function usePrefersLight(): boolean {
-  const [light, setLight] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia(LIGHT_QUERY);
-    const update = () => setLight(mql.matches);
-    update();
-    mql.addEventListener('change', update);
-    return () => mql.removeEventListener('change', update);
-  }, []);
-
-  return light;
+  return useSyncExternalStore(subscribeScheme, readScheme, () => false);
 }
 
 /**

@@ -1,0 +1,27 @@
+[
+  {
+    "state": "hover",
+    "changedPixels": 12765,
+    "maxChannelDelta": 21
+  },
+  {
+    "state": "group-hover",
+    "changedPixels": 12423,
+    "maxChannelDelta": 24
+  },
+  {
+    "state": "glyph",
+    "changedPixels": 12707,
+    "maxChannelDelta": 17
+  },
+  {
+    "state": "medium",
+    "changedPixels": 8192,
+    "maxChannelDelta": 20
+  },
+  {
+    "state": "dense-settled",
+    "changedPixels": 12957,
+    "maxChannelDelta": 17
+  }
+]

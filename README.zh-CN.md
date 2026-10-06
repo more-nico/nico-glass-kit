@@ -277,16 +277,26 @@ npm run typecheck        # tsc --noEmit，覆盖 src/ 与 playground/
 npm test                 # vitest，node 环境，只测纯函数
 npm run build            # 只打包库（dist/），不打包 playground
 npm run build:playground # 打包 playground（playground/dist）
+npm run test:browser     # Playwright 真实 Chromium 回归检查
+npm run bench:build      # 构建生产模式 Benchmark
+npm run bench:serve      # 测试页 http://127.0.0.1:4178
+npm run bench:run -- label # FPS / CPU / GPU / 内存与截图
 ```
 
-测试跑在 node 环境里，所以只覆盖纯函数——位移贴图编码、滤镜图、材质合并、背景探测调度。需要画布或合成器的部分只能在 playground 里人工验证。
+单元测试运行于 node；浏览器测试覆盖 Canvas、指针交互、滤镜生命周期、尺寸 / DPR 更新与回退。先运行 `npx playwright install chromium`，或将 `BENCH_BROWSER_PATH` 指向已安装的 Chromium。完全相同条件下的性能与视觉对比见 [Benchmark 复跑说明](benchmarks/README.md)、[第二轮实测报告](benchmarks/report-round2.md)、[源码审查与补充复测](benchmarks/report-review.md) 与 [第一轮报告](benchmarks/report.md)。
 
 ## 说明与限制
 
 - 背景探测是对真实像素的近似：径向渐变取最远角档位，角关键字线性渐变按 45° 对角线近似，`url()` 背景只在 CORS 干净时逐像素采样；读不出来的背景退回 `prefers-color-scheme`。
-- `iframe`、`object`、`embed`、`video`、`canvas` 视为不可知的不透明层：命中它们的采样点会被丢弃，而不是相信元素自身的 CSS 背景。
+- 可见的 `iframe`、`object`、`embed`、`video`、`canvas` 视为不可知的不透明层：命中它们的采样点会被丢弃，而不是相信元素自身的 CSS 背景。前方已有不透明绘制层时结束搜索，后方被遮住的内容不会让可读采样失效。
 - 含 `url()` 的 `backdrop-filter` 链里其它函数会被浏览器丢弃，所以模糊与饱和度都写在 SVG 图里，CSS 里不写。
 - 交给滤镜的位移贴图是刻意降采样的（`lensMapRasterScale`，默认 `0.2`，范围 `0.1`–`0.5`）：折射边缘会稍软一点，换来明显更低的合成准备开销。
+- 运行时位移图缓存只保留 PNG，公共 `generateLensMap()` 仍返回完整像素；共享缓存同时限制为 32 条 / 32 MiB。超过 64 × 1024 × 1024 个物理像素或非有限几何值时，安全退回原有 CSS 路径，避免病态尺寸分配失控。
+- 高质量表面在无动态折射和悬停亮度时共享相同滤镜，交互表面仍使用私有滤镜。PNG 编码改用 CPU Canvas 并保留 `high` 平滑，避免同步 GPU 读回；不同后端的舍入会造成折射边缘极小的像素差异。
+- 字形距离变换复用临时缓冲区，像素值保持一致；字形 PNG 缓存限制为 128 条 / 32 MiB。超过 4 × 1024 × 1024 个物理像素（含距离场边界）的字形在分配前沿原有路径回退为可读文本。
+- 解码背景图片采用 32 条 LRU 和 64 MiB 估算预算。为避免反复解码，允许保留一张超预算图片；这是软保留预算，不是浏览器或 GPU 内存上限。
+- 最多同时解码 4 张私有图片。每个绘制节点通过弱引用缓存最多 64 个按几何坐标区分的精确采样颜色，不持有图片缓冲；同时可见的图片多于 LRU 容量时也能稳定完成探测，尺寸变化会重新采样。
+- 弹性、高光和指针读取共享每帧一次原生动画回调。自动背景明暗保留全部 9 个采样点及面积权重；慢运动探测跨帧完成，采样可能覆盖不同时间的背景，明暗决策可能延后。快速探测整批完成，检测到真实颜色 / 图片变化后优先重启陈旧任务。普通时间片 6ms、续算最多 16ms、绘制变化最多 32ms，均为软预算，无法中断单次原生命中测试。
 
 ## 许可
 

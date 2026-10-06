@@ -4,6 +4,8 @@ import {
   clearLensMapCache,
   computeLensPixels,
   generateLensMap,
+  generateLensMapImage,
+  LENS_MAP_CACHE_BYTES,
   lensMapCacheKey,
   lensMapCacheStats,
   lensMapRasterSize,
@@ -83,6 +85,12 @@ describe('computeLensPixels', () => {
     const bR = bucket[((60 * 200) + (200 - 1 - 6)) * 4];
     const sR = squircle[((60 * 200) + (200 - 1 - 6)) * 4];
     expect(bR).not.toBe(sR);
+  });
+
+  it('rejects non-finite and pathological geometry before allocating', () => {
+    for (const override of [{ width: Infinity }, { height: NaN }, { dpr: NaN }, { edge: NaN }, { width: 10000, height: 10000 }]) {
+      expect(() => computeLensPixels({ ...BASE, ...override })).toThrow(RangeError);
+    }
   });
 });
 
@@ -202,5 +210,29 @@ describe('generateLensMap', () => {
     expect(result.pixelHeight).toBe(240);
     expect(result.rasterScale).toBe(0.25);
     expect(result.dataUrl).toBe('');
+  });
+
+  it('bounds retained bytes even when a single public pixel map exceeds the cache budget', () => {
+    const result = generateLensMap({ ...BASE, width: 3000, height: 3000, skipDataUrl: true });
+    expect(result.pixels.byteLength).toBe(36_000_000);
+    expect(lensMapCacheStats().bytes).toBeLessThanOrEqual(LENS_MAP_CACHE_BYTES);
+    expect(lensMapCacheStats().size).toBe(0);
+  });
+
+  it('retains no raw pixels in the runtime image cache and reuses rasters across strengths', () => {
+    const before = lensMapCacheStats();
+    const a = generateLensMapImage({ ...BASE, skipDataUrl: true });
+    const b = generateLensMapImage({ ...BASE, strength: 0.5, skipDataUrl: true });
+    expect('pixels' in a).toBe(false); expect(b.maxScale).toBe(a.maxScale / 2);
+    expect(lensMapCacheStats().generated - before.generated).toBe(1);
+    expect(lensMapCacheStats().bytes).toBe(0);
+  });
+
+  it('does not return a raw-only cache entry to a PNG request or cache a failed encode', () => {
+    const raw = generateLensMap({ ...BASE, skipDataUrl: true });
+    const domRequest = generateLensMap(BASE);
+    expect(domRequest).not.toBe(raw);
+    const before = lensMapCacheStats(); generateLensMap(BASE);
+    expect(lensMapCacheStats().misses - before.misses).toBe(1);
   });
 });

@@ -1,0 +1,4 @@
+# Frozen benchmark builds, measurements and screenshots keep their exact hashes.
+benchmarks/evidence/** -text
+benchmarks/evidence-round2/** -text
+benchmarks/evidence-review/** -text

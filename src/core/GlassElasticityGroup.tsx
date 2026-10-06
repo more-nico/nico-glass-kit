@@ -1,5 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { mapPointerToElasticityGroup, unionElasticityRects, type ElasticityPointer } from './elasticityGroup';
+import { observeResize } from './observeResize';
+import { cancelGlassFrame, requestGlassFrame } from './animationFrame';
 
 export type ElasticityPointerHandler = (pointer: ElasticityPointer | null) => void;
 
@@ -30,21 +32,18 @@ export function GlassElasticityGroup({ children, elasticity = 0.2 }: GlassElasti
 
   const register = useCallback((element: HTMLElement, handler: ElasticityPointerHandler) => {
     membersRef.current.set(element, handler);
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => refreshRef.current());
-      resizeObserver.observe(element);
-    }
+    const unobserve = observeResize(element, () => refreshRef.current());
     refreshRef.current();
 
     return () => {
       membersRef.current.delete(element);
-      resizeObserver?.disconnect();
+      unobserve();
       refreshRef.current();
     };
   }, []);
 
   useEffect(() => {
+    let raf = 0;
     const reset = () => {
       lastPointerRef.current = null;
       if (!activeRef.current) return;
@@ -78,17 +77,20 @@ export function GlassElasticityGroup({ children, elasticity = 0.2 }: GlassElasti
       for (const [, handler] of members) handler(mapped);
     };
 
-    refreshRef.current = refresh;
+    // Many events/observer deliveries can arrive before one paint. Read the
+    // group bounds once, from the latest pointer and the current layout.
+    const schedule = () => { if (!raf) raf = requestGlassFrame(() => { raf = 0; refresh(); }); };
+    refreshRef.current = schedule;
     const onPointerMove = (event: PointerEvent) => {
       lastPointerRef.current = { x: event.clientX, y: event.clientY };
-      refresh();
+      schedule();
     };
     const onPointerCancel = () => reset();
     const onPointerOut = (event: PointerEvent) => {
       if (event.relatedTarget === null) reset();
     };
     const onWindowBlur = () => reset();
-    const onLayoutChange = () => refresh();
+    const onLayoutChange = () => schedule();
 
     document.addEventListener('pointermove', onPointerMove, { passive: true });
     document.addEventListener('pointercancel', onPointerCancel);
@@ -105,6 +107,7 @@ export function GlassElasticityGroup({ children, elasticity = 0.2 }: GlassElasti
       window.removeEventListener('resize', onLayoutChange);
       window.removeEventListener('scroll', onLayoutChange, true);
       refreshRef.current = () => undefined;
+      if (raf) cancelGlassFrame(raf);
       reset();
     };
   }, []);

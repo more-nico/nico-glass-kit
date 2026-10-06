@@ -1,0 +1,90 @@
+{
+  "hitCount": 10341,
+  "hitMs": 1814.2000007629395,
+  "rectCount": 10317,
+  "styleCount": 3893,
+  "hits": {
+    "": 56829,
+    "ngs-content": 11215,
+    "ngs-motion": 10981,
+    "ngs-surface": 11482,
+    "lines": 10341,
+    "orb a": 1104,
+    "orb c": 456,
+    "orb b": 1249
+  },
+  "samples": [
+    {
+      "ms": 0.40000003576278687,
+      "elements": [
+        "",
+        "ngs-content",
+        "ngs-motion",
+        "ngs-surface",
+        "",
+        "lines",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "ms": 0.19999998807907104,
+      "elements": [
+        "ngs-content",
+        "ngs-motion",
+        "ngs-surface",
+        "",
+        "lines",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "ms": 0.19999998807907104,
+      "elements": [
+        "ngs-content",
+        "ngs-motion",
+        "ngs-surface",
+        "",
+        "lines",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "ms": 0.10000002384185791,
+      "elements": [
+        "",
+        "ngs-content",
+        "ngs-motion",
+        "ngs-surface",
+        "",
+        "lines",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "ms": 0.19999998807907104,
+      "elements": [
+        "ngs-content",
+        "ngs-motion",
+        "ngs-surface",
+        "",
+        "lines",
+        "",
+        "",
+        "",
+        ""
+      ]
+    }
+  ]
+}

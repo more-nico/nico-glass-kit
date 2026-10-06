@@ -14,6 +14,8 @@
  * bottom section touches the DOM.
  */
 
+import { createBackdropImageCache } from './imageCache';
+
 export interface Rgba {
   r: number;
   g: number;
@@ -575,7 +577,9 @@ export function invalidateBackdropPaintInfo(): void {
 function paintInfoFor(node: Element, cs: CSSStyleDeclaration): NodePaintInfo {
   let info = paintInfoCache.get(node);
   if (!info) {
-    const image = firstImageLayer(cs.backgroundImage);
+    const backgroundImage = cs.backgroundImage;
+    rememberPaint(node, 'image', backgroundImage);
+    const image = firstImageLayer(backgroundImage);
     info = {
       image,
       gradient: image?.kind === 'gradient' ? parseGradient(image.layer) : null,
@@ -596,19 +600,65 @@ interface ProbeRun {
   fallback: Rgba;
   styles: Map<Element, CSSStyleDeclaration>;
   rects: Map<Element, DOMRect>;
+  colors: Map<Element, Rgba | null>;
   pendingImages: boolean;
 }
 
+let batchRun: ProbeRun | null = null;
+let batchVersion = 0;
+// Compare only paint already read by probes, without reading CSS on every
+// transform mutation. Weak keys do not retain detached background nodes.
+const lastPaint = new WeakMap<Element, { color?: string; image?: string }>();
+let paintChanged = false;
+function rememberPaint(node: Element, field: 'color' | 'image', value: string): void {
+  // Internal tints transition after data-ngs-light flips; their existing
+  // settle timer handles them, rather than treating each fade as new page paint.
+  if (node.getAttribute?.('data-ngs-internal')) return;
+  let previous = lastPaint.get(node);
+  if (!previous) { previous = {}; lastPaint.set(node, previous); }
+  if (previous[field] !== undefined && previous[field] !== value) paintChanged = true;
+  previous[field] = value;
+}
+
+/** Scheduler consumes this after a safe generator yield, never during DOM reads. */
+export function consumeBackdropPaintChange(): boolean {
+  const changed = paintChanged; paintChanged = false; return changed;
+}
+
+/**
+ * Share frame-local DOM reads across independent surfaces, then discard them.
+ * No cache crosses a frame: scrolling, transforms, transitions and external
+ * synchronous style changes still get fresh geometry/computed colours.
+ */
+export function withBackdropProbeBatch(run: () => void): void {
+  const previous = batchRun;
+  const wasActive = batchActive;
+  batchRun = null;
+  batchActive = true;
+  batchVersion++;
+  try { run(); } finally { batchRun = previous; batchActive = wasActive; batchVersion++; }
+}
+
 function createProbeRun(doc: Document, win: Window): ProbeRun {
-  return {
+  if (batchRun?.doc === doc && batchRun.win === win) {
+    return { ...batchRun, pendingImages: false };
+  }
+  const run: ProbeRun = {
     doc,
     win,
     fallback: pageFallbackColor(doc),
     styles: new Map(),
     rects: new Map(),
+    colors: new Map(),
     pendingImages: false,
   };
+  // Only scheduler batches reuse this context. Direct public probes must not
+  // retain DOM nodes or stale layout between independent invocations.
+  if (batchActive) batchRun = run;
+  return run;
 }
+
+let batchActive = false;
 
 function buildLayer(
   run: ProbeRun,
@@ -624,32 +674,27 @@ function buildLayer(
   const info = paintInfoFor(node, cs);
   let imageColor: Rgba | null = null;
   if (info.image && info.image.kind === 'url') {
-    // The cached FirstImage holds the exact URL string object, so this
-    // lookup is an identity hit instead of re-hashing megabytes per point.
-    const state = requestImage(info.image.url);
-    if (state === 'pending') {
-      run.pendingImages = true;
-    } else if (state !== 'failed') {
-      // Precise pixel only for the cover+center case the playground and
-      // most full-bleed backgrounds use; otherwise the whole-image average.
-      const precise =
-        info.size === 'cover' &&
-        (info.position === 'center' ||
-          info.position.includes('center') ||
-          info.position.includes('50%'));
-      imageColor = precise
-        ? sampleImagePixel(state.img, { width: nodeRect.width, height: nodeRect.height }, point) ??
-          state.average
-        : state.average;
-    }
+    const sample = requestImageSample(node, info, info.image.url,
+      { width: nodeRect.width, height: nodeRect.height }, point);
+    imageColor = sample.color;
+    run.pendingImages ||= sample.pending;
   }
   return {
     box: { width: nodeRect.width, height: nodeRect.height },
     point,
-    backgroundColor: parseCssColor(cs.backgroundColor),
+    backgroundColor: frameColor(run, node, cs),
     gradient: info.gradient,
     imageColor,
   };
+}
+
+function frameColor(run: ProbeRun, node: Element, cs: CSSStyleDeclaration): Rgba | null {
+  if (!run.colors.has(node)) {
+    const color = cs.backgroundColor;
+    rememberPaint(node, 'color', color);
+    run.colors.set(node, parseCssColor(color));
+  }
+  return run.colors.get(node) ?? null;
 }
 
 /**
@@ -663,6 +708,7 @@ function gatherLayers(
   point: Point,
 ): PaintLayer[] | null {
   const layers: PaintLayer[] = [];
+  let considered = 0;
   for (const node of behind) {
     if (isExcluded(node)) continue;
     if (UNKNOWN_CONTENT_TAGS.has(node.tagName)) {
@@ -676,41 +722,82 @@ function gatherLayers(
       run.styles.set(node, cs);
     }
     if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+    considered++;
+    const info = paintInfoFor(node, cs);
+    const color = frameColor(run, node, cs);
+    // Transparent structural wrappers have no paint to position or sample.
+    if ((!color || color.a === 0) && !info.image) {
+      if (considered >= MAX_LAYERS_PER_POINT) break;
+      continue;
+    }
     let nodeRect = run.rects.get(node);
     if (!nodeRect) {
       nodeRect = node.getBoundingClientRect();
       run.rects.set(node, nodeRect);
     }
-    layers.push(
-      buildLayer(run, node, cs, nodeRect, {
+    const layer = buildLayer(run, node, cs, nodeRect, {
         x: point.x - nodeRect.left,
         y: point.y - nodeRect.top,
-      }),
-    );
-    if (layers.length >= MAX_LAYERS_PER_POINT) break;
+      });
+    layers.push(layer);
+    // resolvePointColor cannot see anything below an opaque layer. Do not
+    // decode hidden images or let an unreadable video underneath discard it.
+    if ((layer.backgroundColor?.a ?? 0) >= 0.999 || (layer.imageColor?.a ?? 0) >= 0.999 ||
+      layer.gradient?.stops.every(stop => stop.color.a >= 0.999)) break;
+    if (considered >= MAX_LAYERS_PER_POINT) break;
   }
   return layers;
 }
 
 /** Runs the 3×3 interior grid over `rect`, keeping only usable points. */
-function probeGrid(
-  run: ProbeRun,
-  rect: { left: number; top: number; width: number; height: number },
-  resolveLayers: (stack: Element[], x: number, y: number) => PaintLayer[] | null,
-): number[] {
-  const { win } = run;
+function* probeGridSteps(
+  doc: Document,
+  win: Window,
+  getRect: (run: ProbeRun) => DOMRect,
+  resolveLayers: (run: ProbeRun, stack: Element[], x: number, y: number) => PaintLayer[] | null,
+): Generator<void, { luminances: number[]; pendingImages: boolean }> {
   const luminances: number[] = [];
+  let pendingImages = false;
+  let lastBatch = -1;
+  let currentRun: ProbeRun | null = null;
   for (const fx of GRID_FRACTIONS) {
     for (const fy of GRID_FRACTIONS) {
+      // A suspended task resumes with this batch's fresh styles and geometry,
+      // never a computed-style/rect cache from a previous frame.
+      if (!currentRun || lastBatch !== batchVersion) {
+        currentRun = createProbeRun(doc, win);
+        lastBatch = batchVersion;
+      }
+      const run = currentRun;
+      const rect = getRect(run);
       const x = Math.min(Math.max(rect.left + rect.width * fx, 0), win.innerWidth - 1);
       const y = Math.min(Math.max(rect.top + rect.height * fy, 0), win.innerHeight - 1);
-      const stack = run.doc.elementsFromPoint(x, y);
-      const layers = resolveLayers(stack, x, y);
-      if (!layers) continue;
-      luminances.push(relativeLuminance(resolvePointColor(layers, run.fallback)));
+      const stack = doc.elementsFromPoint(x, y);
+      const layers = resolveLayers(run, stack, x, y);
+      if (layers) luminances.push(relativeLuminance(resolvePointColor(layers, run.fallback)));
+      pendingImages ||= run.pendingImages;
+      yield;
     }
   }
-  return luminances;
+  return { luminances, pendingImages };
+}
+
+function frameRect(run: ProbeRun, el: Element): DOMRect {
+  let rect = run.rects.get(el);
+  if (!rect) { rect = el.getBoundingClientRect(); run.rects.set(el, rect); }
+  return rect;
+}
+
+function finishProbe<T>(steps: Generator<void, T>): T {
+  const drain = () => {
+    let step = steps.next();
+    while (!step.done) step = steps.next();
+    return step.value;
+  };
+  if (batchActive) return drain();
+  let result!: T;
+  withBackdropProbeBatch(() => { result = drain(); });
+  return result;
 }
 
 function mean(values: readonly number[]): number {
@@ -732,6 +819,11 @@ function visibleRectArea(rect: DOMRect, win: Window): number {
 }
 
 export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
+  return finishProbe(probeBackdropLightSteps(el));
+}
+
+/** Same nine samples, resumable between native hit tests by the scheduler. */
+export function* probeBackdropLightSteps(el: HTMLElement): Generator<void, BackdropProbe | null> {
   const doc = el.ownerDocument;
   const win = doc.defaultView;
   if (!win || typeof doc.elementsFromPoint !== 'function') return null;
@@ -744,8 +836,7 @@ export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
     rect.left >= win.innerWidth;
   if (offscreen) return null;
 
-  const run = createProbeRun(doc, win);
-  const luminances = probeGrid(run, rect, (stack, x, y) => {
+  const { luminances, pendingImages } = yield* probeGridSteps(doc, win, run => frameRect(run, el), (run, stack, x, y) => {
     const self = stack.indexOf(el);
     const behind =
       self >= 0
@@ -757,8 +848,8 @@ export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
   // Empty grid = every point landed on unknowable opaque content (or the
   // element was clamped out of any readable paint) — signal "unreadable"
   // rather than an empty average.
-  if (!luminances.length) return { averageLuminance: null, pendingImages: run.pendingImages };
-  return { averageLuminance: mean(luminances), pendingImages: run.pendingImages };
+  if (!luminances.length) return { averageLuminance: null, pendingImages };
+  return { averageLuminance: mean(luminances), pendingImages };
 }
 
 /**
@@ -775,16 +866,23 @@ export function probeBackdropLight(el: HTMLElement): BackdropProbe | null {
 export function probeMembersBackdropLight(
   members: readonly HTMLElement[],
 ): BackdropProbe | null {
+  return finishProbe(probeMembersBackdropLightSteps(members));
+}
+
+/** Area-weighted group probe with the same grid, resumable at each point. */
+export function* probeMembersBackdropLightSteps(
+  members: readonly HTMLElement[],
+): Generator<void, BackdropProbe | null> {
   const connected = members.filter((member) => member.isConnected);
   if (!connected.length) return null;
   const doc = connected[0].ownerDocument;
   const win = doc.defaultView;
   if (!win || typeof doc.elementsFromPoint !== 'function') return null;
 
-  const run = createProbeRun(doc, win);
   const isMemberNode = (node: Element) => isWithinMembers(node, connected);
   const samples: { luminance: number; weight: number }[] = [];
   let measurable = false;
+  let pendingImages = false;
 
   for (const member of connected) {
     const rect = member.getBoundingClientRect();
@@ -792,18 +890,20 @@ export function probeMembersBackdropLight(
     const weight = visibleRectArea(rect, win);
     if (weight <= 0) continue;
     measurable = true;
-    const luminances = probeGrid(run, rect, (stack, x, y) => {
+    const grid = yield* probeGridSteps(doc, win, run => frameRect(run, member), (run, stack, x, y) => {
       const boundary = stack.findIndex((node) => isMemberNode(node));
       if (boundary < 0) return null; // point not covered by the group
       return gatherLayers(run, stack.slice(boundary + 1), isMemberNode, { x, y });
     });
+    const { luminances } = grid;
+    pendingImages ||= grid.pendingImages;
     if (!luminances.length) continue;
     samples.push({ luminance: mean(luminances), weight });
   }
 
   if (!measurable) return null; // every member offscreen/zero-size: keep last
-  if (!samples.length) return { averageLuminance: null, pendingImages: run.pendingImages };
-  return { averageLuminance: aggregateLuminance(samples), pendingImages: run.pendingImages };
+  if (!samples.length) return { averageLuminance: null, pendingImages };
+  return { averageLuminance: aggregateLuminance(samples), pendingImages };
 }
 
 function pageFallbackColor(doc: Document): Rgba {
@@ -900,9 +1000,32 @@ interface ImageEntry {
   average: Rgba;
 }
 
-type ImageState = ImageEntry | 'pending' | 'failed';
+type ImageState = ImageEntry | 'failed';
 
-const imageStates = new Map<string, ImageState>();
+interface ImageSamples { node: Element; url: string; colors: Map<string, Rgba | null>; }
+interface SampleRequest { box: Box | null; point: Point | null; }
+interface ImageLoad {
+  img: HTMLImageElement | null;
+  requests: Map<ImageSamples, Map<string, SampleRequest>>;
+}
+// Store only exact sampled colours on weakly held painted nodes. An active
+// working set larger than the decoded-image LRU must not continuously reload
+// evicted images (and re-trigger every auto-light probe). Geometry is part of
+// each key; transforms/resizes still request fresh, full-precision samples.
+const nodeImageSamples = new WeakMap<Element, ImageSamples>();
+const IMAGE_SAMPLE_LIMIT = 64;
+const IMAGE_DECODE_CONCURRENCY = 4;
+const decodingImages = new Map<string, ImageLoad>();
+let activeImageDecodes = 0;
+let imageSweepTimer = 0;
+const imageStates = createBackdropImageCache<ImageState>(
+  (url,state)=>url.length*2 + (typeof state === 'object' ? state.img.naturalWidth*state.img.naturalHeight*4 : 0),
+  () => {},
+);
+
+/** Internal diagnostics; decoded image cost is an estimate, not GPU residency. */
+export const backdropImageCacheStats = () => ({...imageStates.stats(),pending:decodingImages.size,
+  activeDecodes: activeImageDecodes});
 const imageSettleListeners = new Set<() => void>();
 
 /** Subscribes to image decode settle events; every active hook re-probes. */
@@ -913,25 +1036,103 @@ export function onImagesSettled(listener: () => void): () => void {
   };
 }
 
-function requestImage(url: string): ImageState {
-  const existing = imageStates.get(url);
-  if (existing) return existing;
-  if (typeof window === 'undefined' || typeof Image === 'undefined') return 'failed';
-  imageStates.set(url, 'pending');
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => {
-    const average = computeImageAverage(img);
-    imageStates.set(url, average ? { img, average } : 'failed');
-    notifyImagesSettled();
-  };
-  img.onerror = () => {
-    // CORS-tainted or broken; cached as failed so we never retry-loop.
-    imageStates.set(url, 'failed');
-    notifyImagesSettled();
-  };
-  img.src = url;
-  return 'pending';
+function retainSample(samples: ImageSamples, key: string, color: Rgba | null): void {
+  samples.colors.delete(key);
+  samples.colors.set(key, color);
+  if (samples.colors.size > IMAGE_SAMPLE_LIMIT) samples.colors.delete(samples.colors.keys().next().value!);
+}
+
+function imageSample(state: ImageState, request: SampleRequest): Rgba | null {
+  if (state === 'failed') return null;
+  return request.box && request.point
+    ? sampleImagePixel(state.img, request.box, request.point) ?? state.average
+    : state.average;
+}
+
+function requestImageSample(node: Element, info: NodePaintInfo, url: string, box: Box, point: Point):
+  { color: Rgba | null; pending: boolean } {
+  let samples = nodeImageSamples.get(node);
+  if (!samples || samples.url !== url) {
+    samples = { node, url, colors: new Map() };
+    nodeImageSamples.set(node, samples);
+  }
+  const precise = info.size === 'cover' &&
+    (info.position === 'center' || info.position.includes('center') || info.position.includes('50%'));
+  const key = precise ? `${box.width},${box.height},${point.x},${point.y}` : 'average';
+  if (samples.colors.has(key)) {
+    const color = samples.colors.get(key)!;
+    retainSample(samples, key, color);
+    return { color, pending: false };
+  }
+  const request: SampleRequest = precise ? { box, point } : { box: null, point: null };
+  const state = imageStates.get(url);
+  if (state) {
+    const color = imageSample(state, request);
+    retainSample(samples, key, color);
+    return { color, pending: false };
+  }
+  if (typeof window === 'undefined' || typeof Image === 'undefined') return { color: null, pending: false };
+  let load = decodingImages.get(url);
+  if (!load) { load = { img: null, requests: new Map() }; decodingImages.set(url, load); }
+  let requests = load.requests.get(samples);
+  if (!requests) { requests = new Map(); load.requests.set(samples, requests); }
+  requests.delete(key); requests.set(key, request);
+  if (requests.size > IMAGE_SAMPLE_LIMIT) requests.delete(requests.keys().next().value!);
+  pumpImageDecodes();
+  return { color: null, pending: true };
+}
+
+/** Queued sample owners hold no image buffers; at most four private images decode concurrently. */
+function pumpImageDecodes(): void {
+  // Superseded paint and removed nodes no longer need these samples. Do not
+  // let a slow slideshow or unmount leave an ever-growing queue of old URLs.
+  for (const [url, load] of decodingImages) {
+    for (const samples of load.requests.keys()) {
+      if (!samples.node.isConnected || nodeImageSamples.get(samples.node) !== samples) load.requests.delete(samples);
+    }
+    if (!load.requests.size) {
+      if (load.img) {
+        load.img.onload = null; load.img.onerror = null; load.img.src = '';
+        activeImageDecodes--;
+      }
+      decodingImages.delete(url);
+    }
+  }
+  for (const [url, load] of decodingImages) {
+    if (activeImageDecodes >= IMAGE_DECODE_CONCURRENCY) break;
+    if (load.img) continue;
+    const img = new Image();
+    load.img = img;
+    activeImageDecodes++;
+    img.crossOrigin = 'anonymous';
+    const settle = (state: ImageState) => {
+      if (decodingImages.get(url) !== load) return;
+      img.onload = null; img.onerror = null;
+      // Fill every requested point before publishing/evicting the decoded
+      // image. A subsequent probe can use its exact colours after LRU eviction.
+      for (const [samples, requests] of load.requests) {
+        for (const [key, request] of requests) retainSample(samples, key, imageSample(state, request));
+      }
+      imageStates.set(url, state);
+      decodingImages.delete(url);
+      activeImageDecodes--;
+      pumpImageDecodes();
+      notifyImagesSettled();
+    };
+    img.onload = () => {
+      const average = computeImageAverage(img);
+      settle(average ? { img, average } : 'failed');
+    };
+    img.onerror = () => settle('failed');
+    img.src = url;
+  }
+  // Sweep only while requests exist, including while all four network loads
+  // are stalled. Queued node references disappear shortly after DOM removal.
+  if (decodingImages.size && !imageSweepTimer) {
+    imageSweepTimer = window.setTimeout(() => { imageSweepTimer = 0; pumpImageDecodes(); }, 250);
+  } else if (!decodingImages.size && imageSweepTimer) {
+    window.clearTimeout(imageSweepTimer); imageSweepTimer = 0;
+  }
 }
 
 function notifyImagesSettled(): void {

@@ -7,3 +7,8 @@ vite.config.*.timestamp-*.mjs
 # local AI tooling (not published)
 .kilo/
 AGENTS.md
+.benchmark-dist/
+.benchmark-baseline/
+benchmarks/results/
+test-results/
+playwright-report/

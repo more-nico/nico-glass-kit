@@ -1,0 +1,128 @@
+[
+  {
+    "name": "normal",
+    "previous": "round2-balanced-baseline/animated-25.png",
+    "optimized": "round2-balanced-optimized/animated-25.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "aboveOne": 0,
+    "maxChannelDelta": 0,
+    "meanAbsoluteChannelDelta": 0
+  },
+  {
+    "name": "dense-settled",
+    "previous": "round2-visual/dense-settled-baseline.png",
+    "optimized": "round2-visual/dense-settled-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "aboveOne": 0,
+    "maxChannelDelta": 0,
+    "meanAbsoluteChannelDelta": 0
+  },
+  {
+    "name": "hover",
+    "previous": "round2-visual/hover-baseline.png",
+    "optimized": "round2-visual/hover-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "aboveOne": 0,
+    "maxChannelDelta": 0,
+    "meanAbsoluteChannelDelta": 0
+  },
+  {
+    "name": "group-hover",
+    "previous": "round2-visual/group-hover-baseline.png",
+    "optimized": "round2-visual/group-hover-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "aboveOne": 0,
+    "maxChannelDelta": 0,
+    "meanAbsoluteChannelDelta": 0
+  },
+  {
+    "name": "glyph",
+    "previous": "round2-visual/glyph-baseline.png",
+    "optimized": "round2-visual/glyph-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 1390,
+      "width": 1250,
+      "height": 340
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 120,
+    "changedPercent": 0.0023148148148148147,
+    "aboveOne": 1,
+    "maxChannelDelta": 2,
+    "meanAbsoluteChannelDelta": 0.000007780349794238683
+  },
+  {
+    "name": "medium",
+    "previous": "round2-visual/medium-baseline.png",
+    "optimized": "round2-visual/medium-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "aboveOne": 0,
+    "maxChannelDelta": 0,
+    "meanAbsoluteChannelDelta": 0
+  },
+  {
+    "name": "4k",
+    "previous": "round2-balanced-baseline/4k-quality-25.png",
+    "optimized": "round2-balanced-optimized/4k-quality-25.png",
+    "crop": {
+      "x": 20,
+      "y": 70,
+      "width": 1520,
+      "height": 350
+    },
+    "width": 3840,
+    "height": 2160,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "aboveOne": 0,
+    "maxChannelDelta": 0,
+    "meanAbsoluteChannelDelta": 0
+  }
+]

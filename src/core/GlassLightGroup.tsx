@@ -1,7 +1,8 @@
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { probeMembersBackdropLight, unionRect, type VisibleRect } from './backdropProbe';
+import { probeMembersBackdropLight, probeMembersBackdropLightSteps, unionRect, type VisibleRect, type BackdropProbe } from './backdropProbe';
 import { invalidateProbe, subscribeProbe, type ProbeTarget } from './backdropProbeScheduler';
 import { INITIAL_GROUP_LIGHT_STATE, stepGroupLight, type GroupLightState } from './groupLight';
+import { observeResize } from './observeResize';
 
 /**
  * Stable registration channel. Kept apart from the light value so a mode flip
@@ -38,12 +39,31 @@ function rectOf(el: HTMLElement): VisibleRect {
  */
 export function GlassLightGroup({ children }: GlassLightGroupProps) {
   const membersRef = useRef(new Set<HTMLElement>());
+  const membersVersionRef = useRef(0);
   const stateRef = useRef<GroupLightState>(INITIAL_GROUP_LIGHT_STATE);
   const settleTimerRef = useRef(0);
   const [light, setLight] = useState<boolean | null>(null);
 
   const targetRef = useRef<ProbeTarget | null>(null);
   if (!targetRef.current) {
+    const applyProbe = (probe: BackdropProbe | null) => {
+      if (!probe) return;
+      if (probe.averageLuminance === null) {
+        stateRef.current = INITIAL_GROUP_LIGHT_STATE;
+        setLight(null);
+        return;
+      }
+      const step = stepGroupLight(stateRef.current, probe.averageLuminance, performance.now());
+      stateRef.current = step.state;
+      if (step.changed) setLight(step.state.committed);
+      if (step.refireInMs !== null) {
+        if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = window.setTimeout(() => {
+          settleTimerRef.current = 0;
+          invalidateProbe(targetRef.current as ProbeTarget);
+        }, step.refireInMs);
+      }
+    };
     targetRef.current = {
       get el() {
         for (const member of membersRef.current) {
@@ -62,27 +82,21 @@ export function GlassLightGroup({ children }: GlassLightGroupProps) {
         if (typeof document !== 'undefined' && document.hidden) return;
         const members = [...membersRef.current].filter((member) => member.isConnected);
         if (!members.length) return;
-        const probe = probeMembersBackdropLight(members);
-        if (!probe) return; // offscreen / unmeasurable: keep the last decision
-
-        if (probe.averageLuminance === null) {
-          // Backdrop unreadable (e.g. the region is all cross-origin iframe):
-          // fall back to prefers-color-scheme.
-          stateRef.current = INITIAL_GROUP_LIGHT_STATE;
-          setLight(null);
-          return;
+        applyProbe(probeMembersBackdropLight(members));
+      },
+      *createTask() {
+        if (document.hidden) return;
+        const members = [...membersRef.current].filter(member => member.isConnected);
+        if (!members.length) return;
+        const version = membersVersionRef.current;
+        const steps = probeMembersBackdropLightSteps(members);
+        let step = steps.next();
+        while (!step.done) {
+          yield;
+          if (version !== membersVersionRef.current || document.hidden) { steps.return(null); return; }
+          step = steps.next();
         }
-
-        const step = stepGroupLight(stateRef.current, probe.averageLuminance, performance.now());
-        stateRef.current = step.state;
-        if (step.changed) setLight(step.state.committed);
-        if (step.refireInMs !== null) {
-          if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
-          settleTimerRef.current = window.setTimeout(() => {
-            settleTimerRef.current = 0;
-            invalidateProbe(targetRef.current as ProbeTarget);
-          }, step.refireInMs);
-        }
+        if (!document.hidden) applyProbe(step.value);
       },
     };
   }
@@ -100,17 +114,13 @@ export function GlassLightGroup({ children }: GlassLightGroupProps) {
   const register = useCallback((el: HTMLElement) => {
     const members = membersRef.current;
     members.add(el);
-    // One observer per member, mirroring the previous per-element behaviour:
-    // a size change can move the group's covered region.
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => invalidateProbe(targetRef.current as ProbeTarget));
-      observer.observe(el);
-    }
+    membersVersionRef.current++;
+    const unobserve = observeResize(el, () => invalidateProbe(targetRef.current as ProbeTarget));
     invalidateProbe(targetRef.current as ProbeTarget);
     return () => {
       members.delete(el);
-      observer?.disconnect();
+      membersVersionRef.current++;
+      unobserve();
       if (!members.size) {
         stateRef.current = INITIAL_GROUP_LIGHT_STATE;
         setLight(null);

@@ -1,0 +1,94 @@
+[
+  {
+    "name": "(idle)",
+    "ms": 2486.46
+  },
+  {
+    "name": "elementsFromPoint",
+    "ms": 1807.4
+  },
+  {
+    "name": "(program)",
+    "ms": 508.248
+  },
+  {
+    "name": "md",
+    "ms": 40.854,
+    "source": "(e,t,n,r){const l=[];for(const i of t){if(n(i))continue;if(qm.has(i.tagName))return null;let o=e.styles.get(i);if(o||(o=e.win.getComputedStyle(i),e.styles.set(i"
+  },
+  {
+    "name": "getBoundingClientRect",
+    "ms": 37.908
+  },
+  {
+    "name": "Jm",
+    "ms": 21.241,
+    "source": "(e,t){let n=pu.get(e);if(!n){const r=ug(t.backgroundImage);n={image:r,gradient:r?.kind===\"gradient\"?jm(r.layer):null,size:t.backgroundSize,position:t.background"
+  },
+  {
+    "name": "gd",
+    "ms": 20.019,
+    "source": "(e,t,n){const{win:r}=e,l=[];for(const i of Ta)for(const o of Ta){const u=Math.min(Math.max(t.left+t.width*i,0),r.innerWidth-1),s=Math.min(Math.max(t.top+t.heigh"
+  },
+  {
+    "name": "Va",
+    "ms": 15.392,
+    "source": "e=>{document.getElementById(\"backdrop\").style.transform=`translate(${Math.sin(e)*45}px,${Math.cos(e*.7)*25}px)`},zd={ready:!0,pose(){Va(0),document.getElementBy"
+  },
+  {
+    "name": "og",
+    "ms": 11.078,
+    "source": "(e){const t=e.defaultView;if(t)for(const n of[e.body,e.documentElement]){if(!n)continue;const r=di(t.getComputedStyle(n).backgroundColor);if(r&&r.a>=.999)return"
+  },
+  {
+    "name": "getBoundingClientRect",
+    "ms": 6.438
+  },
+  {
+    "name": "getBoundingClientRect",
+    "ms": 6.29
+  },
+  {
+    "name": "(garbage collector)",
+    "ms": 4.988
+  },
+  {
+    "name": "contains",
+    "ms": 4.709
+  },
+  {
+    "name": "",
+    "ms": 4.634,
+    "source": "(u,s,a)=>{const d=u.indexOf(e),m=d>=0?u.slice(d+1):u.filter(f=>f!==e&&!e.contains(f));return md(i,m,f=>e.contains(f),{x:s,y:a})});return o.length?{averageLumina"
+  },
+  {
+    "name": "di",
+    "ms": 4.291,
+    "source": "(e){const t=e.trim().toLowerCase();if(!t)return null;if(t===\"transparent\")return{r:0,g:0,b:0,a:0};const n=Im.exec(t);if(n){const f=n[1];if(f.length===3||f.lengt"
+  },
+  {
+    "name": "kd",
+    "ms": 4.239,
+    "source": "(e,t){const n=new Map;for(const[r,l]of e?.offsets??[])(!(r instanceof Element)||r.isConnected)&&n.set(r,l);for(const[r,l]of t)n.set(r,l);return n}function Cg(e,"
+  },
+  {
+    "name": "tg",
+    "ms": 3.44,
+    "source": "(e,t,n){return e.colors.has(t)||e.colors.set(t,di(n.backgroundColor)),e.colors.get(t)??null}function md(e,t,n,r){const l=[];for(const i of t){if(n(i))continue;i"
+  },
+  {
+    "name": "lg",
+    "ms": 3.115,
+    "source": "(e){const t=e.ownerDocument,n=t.defaultView;if(!n||typeof t.elementsFromPoint!=\"function\")return null;const r=e.getBoundingClientRect();if(r.width<1||r.height<1"
+  },
+  {
+    "name": "Sd",
+    "ms": 3.094,
+    "source": "(){if(Ul)return Ul;const e=new Map;e.set(document,{top:window.scrollY,left:window.scrollX});for(const t of hi)if(!(t===document||!(t instanceof Element))){if(!t"
+  },
+  {
+    "name": "bm",
+    "ms": 3.089,
+    "source": "(e){const t=en,n=Dl;en=null,Dl=!0;try{e()}finally{en=t,Dl=n}}function hd(e,t){if(en?.doc===e&&en.win===t)return{...en,pendingImages:!1};const n={doc:e,win:t,fal"
+  }
+]

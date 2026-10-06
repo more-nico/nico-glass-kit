@@ -1,0 +1,137 @@
+{
+  "before": {
+    "browser": "153.0.8010.12",
+    "repetitions": 3,
+    "durationMs": 5000
+  },
+  "after": {
+    "browser": "153.0.8010.12",
+    "repetitions": 3,
+    "durationMs": 5000
+  },
+  "summaries": [
+    {
+      "name": "idle-25",
+      "before": {
+        "fps": 121.65158506563984,
+        "frameP50Ms": 7.099999999999454,
+        "frameP95Ms": 13.800000000000182,
+        "frameP99Ms": 14,
+        "mountMs": 257.7999999523163,
+        "mainThreadBusyPercent": 1.780447853610106,
+        "browserCPUHostPercent": 0.44012451885482273,
+        "heapMiB": 7.173587799072266,
+        "layoutMs": 0,
+        "styleMs": 0,
+        "longTaskCount": 0,
+        "workingSetMiB": 618.328125,
+        "gpuPercent": 0,
+        "gpuDedicatedMiB": 85.734375
+      },
+      "after": {
+        "fps": 120.28965269661632,
+        "frameP50Ms": 7.099999999999454,
+        "frameP95Ms": 13.800000000000182,
+        "frameP99Ms": 14,
+        "mountMs": 269.10000002384186,
+        "mainThreadBusyPercent": 1.7141601406343157,
+        "browserCPUHostPercent": 0.4886484280439758,
+        "heapMiB": 6.165260314941406,
+        "layoutMs": 0,
+        "styleMs": 0,
+        "longTaskCount": 0,
+        "workingSetMiB": 617.16015625,
+        "gpuPercent": 0,
+        "gpuDedicatedMiB": 92.95703125
+      },
+      "visual": {
+        "changedPixels": 0,
+        "changedPercent": 0,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0
+      }
+    },
+    {
+      "name": "4k-quality-25",
+      "before": {
+        "fps": 41.75490470262252,
+        "frameP50Ms": 21.100000000000364,
+        "frameP95Ms": 28.100000000000364,
+        "frameP99Ms": 28.199999999999818,
+        "mountMs": 221,
+        "mainThreadBusyPercent": 15.84083190143315,
+        "browserCPUHostPercent": 12.084961476974902,
+        "heapMiB": 5.148521423339844,
+        "layoutMs": 0,
+        "styleMs": 8.834999999999999,
+        "longTaskCount": 0,
+        "workingSetMiB": 616.03515625,
+        "gpuPercent": 12,
+        "gpuDedicatedMiB": 212.62890625
+      },
+      "after": {
+        "fps": 41.59369527135491,
+        "frameP50Ms": 21.199999999999818,
+        "frameP95Ms": 28.100000000000364,
+        "frameP99Ms": 28.300000000000182,
+        "mountMs": 221.39999997615814,
+        "mainThreadBusyPercent": 16.12084465391075,
+        "browserCPUHostPercent": 12.241308306067406,
+        "heapMiB": 5.586643218994141,
+        "layoutMs": 0,
+        "styleMs": 9.404000000000003,
+        "longTaskCount": 0,
+        "workingSetMiB": 616.20703125,
+        "gpuPercent": 12,
+        "gpuDedicatedMiB": 212.64453125
+      },
+      "visual": {
+        "changedPixels": 0,
+        "changedPercent": 0,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0
+      }
+    },
+    {
+      "name": "cpu6-dense-100",
+      "before": {
+        "fps": 43.70976714625309,
+        "frameP50Ms": 21,
+        "frameP95Ms": 34.70000000000073,
+        "frameP99Ms": 35.099999999999454,
+        "mountMs": 1601.1000000238419,
+        "mainThreadBusyPercent": 99.28480057253437,
+        "browserCPUHostPercent": 16.59393941121569,
+        "heapMiB": 6.837379455566406,
+        "layoutMs": 0,
+        "styleMs": 106.322,
+        "longTaskCount": 0,
+        "workingSetMiB": 624.92578125,
+        "gpuPercent": 9,
+        "gpuDedicatedMiB": 90.73046875
+      },
+      "after": {
+        "fps": 43.77711308747066,
+        "frameP50Ms": 21,
+        "frameP95Ms": 28.199999999999818,
+        "frameP99Ms": 34.899999999999636,
+        "mountMs": 1619.8999999761581,
+        "mainThreadBusyPercent": 98.86986274151911,
+        "browserCPUHostPercent": 16.12035451817315,
+        "heapMiB": 5.6905059814453125,
+        "layoutMs": 0,
+        "styleMs": 155.552,
+        "longTaskCount": 0,
+        "workingSetMiB": 625.10546875,
+        "gpuPercent": 8,
+        "gpuDedicatedMiB": 91.109375
+      },
+      "visual": {
+        "changedPixels": 0,
+        "changedPercent": 0,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0
+      }
+    }
+  ]
+}

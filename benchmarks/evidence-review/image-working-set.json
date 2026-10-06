@@ -1,0 +1,73 @@
+{
+  "browser": "153.0.8010.12",
+  "collectedAt": "2026-10-06T03:20:27.100Z",
+  "conditions": {
+    "images": 40,
+    "imageWidth": 32,
+    "imageHeight": 32,
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 1,
+    "quality": "high",
+    "samples": 4,
+    "intervalMs": 1000
+  },
+  "results": [
+    {
+      "label": "previous",
+      "script": "http://127.0.0.1:4179/assets/index-Cl4pmo3W.js",
+      "snapshots": [
+        {
+          "second": 1,
+          "privateImageCreates": 324,
+          "correctlyLit": 0
+        },
+        {
+          "second": 2,
+          "privateImageCreates": 654,
+          "correctlyLit": 0
+        },
+        {
+          "second": 3,
+          "privateImageCreates": 989,
+          "correctlyLit": 0
+        },
+        {
+          "second": 4,
+          "privateImageCreates": 1299,
+          "correctlyLit": 0
+        }
+      ],
+      "errors": []
+    },
+    {
+      "label": "optimized",
+      "script": "http://127.0.0.1:4178/assets/index-DmA9kUn9.js",
+      "snapshots": [
+        {
+          "second": 1,
+          "privateImageCreates": 40,
+          "correctlyLit": 40
+        },
+        {
+          "second": 2,
+          "privateImageCreates": 40,
+          "correctlyLit": 40
+        },
+        {
+          "second": 3,
+          "privateImageCreates": 40,
+          "correctlyLit": 40
+        },
+        {
+          "second": 4,
+          "privateImageCreates": 40,
+          "correctlyLit": 40
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

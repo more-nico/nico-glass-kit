@@ -319,12 +319,19 @@ npm run typecheck        # tsc --noEmit, covers src/ and playground/
 npm test                 # vitest, node environment, pure functions only
 npm run build            # bundles the library (dist/), not the playground
 npm run build:playground # bundles the playground (playground/dist)
+npm run test:browser     # real Chromium regression checks (Playwright)
+npm run bench:build      # production benchmark fixture
+npm run bench:serve      # fixture at http://127.0.0.1:4178
+npm run bench:run -- label # FPS / CPU / GPU / memory and screenshots
 ```
 
-The test suite runs in a node environment, so only pure functions are
-covered — the displacement encoding, the filter graph, optics merging, the
-backdrop probe scheduler. Anything that needs a canvas or a compositor has to
-be verified in the playground.
+Unit tests run in node; the browser suite covers Canvas, pointer interaction,
+filter lifetimes, resize/DPR updates and fallbacks. Run `npx playwright install
+chromium` first, or set `BENCH_BROWSER_PATH` to an installed Chromium executable.
+See [benchmark protocol](benchmarks/README.md), [latest measured results](benchmarks/report-round2.md)
+the [source review and follow-up checks](benchmarks/report-review.md),
+and the [first-round results](benchmarks/report.md)
+for identical-condition performance and visual comparisons.
 
 ## Notes and limitations
 
@@ -332,14 +339,41 @@ be verified in the playground.
   farthest-corner stop, corner-keyword linear gradients are approximated as
   45° diagonals, and `url()` backgrounds are sampled only when CORS-clean.
   Unreadable backdrops fall back to `prefers-color-scheme`.
-- `iframe`, `object`, `embed`, `video` and `canvas` are treated as opaque:
+- Visible `iframe`, `object`, `embed`, `video` and `canvas` are treated as opaque:
   their sample points are dropped rather than trusting the element's own CSS
   background.
+  An opaque painted layer in front terminates the search, so unreadable content
+  hidden behind it does not invalidate a readable sample.
 - Backdrop filters drop any other function in a chain containing `url()`, so
   blur and saturation are emitted inside the SVG graph rather than in CSS.
 - The displacement map handed to the filter is intentionally downscaled
   (`lensMapRasterScale`, default `0.2`, range `0.1`–`0.5`): the refraction rim
   softens slightly in exchange for much cheaper compositor preparation.
+- Runtime lens caching retains PNGs rather than full RGBA buffers. The shared
+  lens cache has a 32-entry / 32 MiB budget; public `generateLensMap()` still
+  returns full-resolution pixels. A map above 64 × 1024 × 1024 physical pixels or
+  with non-finite geometry fails safely to the existing CSS fallback.
+- High-tier surfaces without animated refraction or hover brightness can share
+  identical filter graphs; interactive surfaces retain private graphs. PNG
+  encoding uses CPU Canvas with `high` smoothing to avoid GPU readback stalls;
+  backend rounding can produce very small differences along the refraction rim.
+- Glyph distance transforms reuse scratch buffers without changing pixel values.
+  Glyph PNGs have a 128-entry / 32 MiB cache limit; rasters exceeding
+  4 × 1024 × 1024 physical pixels (including field padding) use the readable plain-text fallback before
+  allocating distance-transform buffers.
+- Decoded backdrop images use a 32-entry LRU and a 64 MiB estimated budget.
+  A single oversized image is retained to avoid repeated decoding; this is a
+  soft retention budget, not a cap on browser or GPU memory.
+  Up to four private images decode concurrently. Each painted node weakly retains
+  up to 64 exact sampled colours, keyed by geometry, so a visible working set
+  larger than the LRU can settle without repeated decoding or losing point precision.
+- Springs, glints and pointer reads share one native animation callback per frame.
+  Automatic backdrop lighting retains all nine samples and area weights.
+  Slow motion probes resume across frames, so their samples can span different
+  backdrop states and the tint decision can arrive later. Cheap probes drain
+  together; detected colour/image changes restart stale work with priority.
+  Scheduling uses a 6 ms normal slice, up to 16 ms for continuations and 32 ms
+  for paint changes. These are soft budgets; native hit tests are indivisible.
 
 ## License
 

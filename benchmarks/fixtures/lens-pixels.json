@@ -1,0 +1,578 @@
+[
+  {
+    "options": {
+      "width": 1,
+      "height": 1,
+      "radius": 0,
+      "edge": 0.5,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "79dfad351f79ef0e65a11fff0a9ed44bf628f9390ff06b92ee4ee5e2477616ea"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 1,
+      "radius": 8,
+      "edge": 0.5,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "79dfad351f79ef0e65a11fff0a9ed44bf628f9390ff06b92ee4ee5e2477616ea"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 1,
+      "radius": 40,
+      "edge": 0.5,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "f7647fe3346d42ba156c38687a3d988103ea763b4aeeb9fc540ba9128b8a182f"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 1,
+      "radius": 200,
+      "edge": 0.5,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "df90cef57218519b184a42712ee168009bc15cbd40976dd2cfd25e52fc7de014"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 1,
+      "radius": 0,
+      "edge": 8,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "80c43d0558bcfe6dd7135f657b3fe50fe05ae1e0d087ddc147d1e3da812e10ec"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 1,
+      "radius": 8,
+      "edge": 8,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "dd3896aee3b91e6dcc48e37b2d197c13370a869c8e1c80abb22c1fd4f1e1d067"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 3,
+      "radius": 40,
+      "edge": 8,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "3253baf82e5997e40316ad637f28a069ebea5f40ff4ec4b13237d19ddecba8d2"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 3,
+      "radius": 200,
+      "edge": 8,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "c2fefe45967347ea25936da3d0357fd6db9ff4a0fcbf644b441c4388e90c2e79"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 3,
+      "radius": 0,
+      "edge": 20,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "1c4a6358df22d87d60f68a63b17c63fdc58de7694de006327eac55796b150673"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 3,
+      "radius": 8,
+      "edge": 20,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "8e85a09d0e8877216a3e27ee5c11c0a87af7bdbfb5d9e453626c2ed6ed17d216"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 3,
+      "radius": 40,
+      "edge": 20,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "128d3d3a857a1b76c71dbbdcf1e5eeef3576600c22bf4f5aaf73822c3e934c9c"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 3,
+      "radius": 200,
+      "edge": 20,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 0.25
+    },
+    "sha256": "e610979427ef405764269a3616601ceafa19d18d8e3ffb88f1768977b07eb238"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 19,
+      "radius": 0,
+      "edge": 300,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "04388a92f5fce5129e34be0a3a08e9896cfecfee6c53f295153eb83655699b06"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 19,
+      "radius": 8,
+      "edge": 300,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "ddc2d8e8841e460751645e661116cacad270b6869187bcafb575c76a71318f60"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 19,
+      "radius": 40,
+      "edge": 300,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "dbdc690acef6dc266406ea6ee06063009293cf4ba7470818d0b49e9ed8edcab7"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 19,
+      "radius": 200,
+      "edge": 300,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "a1521c060c6cdac4b6bef7faff38ac30efceaeadce1db4f57ecf5b43766a4043"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 19,
+      "radius": 0,
+      "edge": 0.5,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "c184e9b352cfbcf3e3e8d56f89c7a82dabe0f4a4fa9b338293c609cad9beacd7"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 19,
+      "radius": 8,
+      "edge": 0.5,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "39c2aebbdd8c1b808eab7b21c03cedfc8482dd35bbb8a68557467995934a33a3"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 120,
+      "radius": 40,
+      "edge": 0.5,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "6e2bd0d13a667e1f0546d67adb48757f868cb1df5392fced51d50e49e251c353"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 120,
+      "radius": 200,
+      "edge": 0.5,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "8c6f34165de1a70abd52ccfdad2b9e0713cdb161728b36a4a11b9ecd61916b10"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 120,
+      "radius": 0,
+      "edge": 8,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "95ea8a7751e30fc63a42dfb782ab02974647e5bd5deca95d68bfaaed4fa2a669"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 120,
+      "radius": 8,
+      "edge": 8,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "ed9dd415edd5933950471cf732fe6d9f75b2ce6476a2c9ff8f986e7a96e7ddfa"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 120,
+      "radius": 40,
+      "edge": 8,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "42e9740070cb863794209ba5cc6303d85c736ed01a78a7686b8c5b8f4ac84753"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 120,
+      "radius": 200,
+      "edge": 8,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 1
+    },
+    "sha256": "84678ff1df731148bfd53a72d219d71ad8c6943cdfca7806fc83908a79e17b98"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 121,
+      "radius": 0,
+      "edge": 20,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "5eda6595e774c56b2ffb882b7e51601eccd33fb734aaf1cc32b3a1c2eef7b284"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 121,
+      "radius": 8,
+      "edge": 20,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "69a0938a5bddebdf933b96333c867b78544371a765ea1fab3cf798561b421813"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 121,
+      "radius": 40,
+      "edge": 20,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "e1360f64f6e602afdd36058d38e3519577941ed79f54bb8b016acb071e0b707c"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 121,
+      "radius": 200,
+      "edge": 20,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "b5dda3430588e57df5adc09b860f1ba4bc1e18ba43ca7336882c963a4ab7bb16"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 121,
+      "radius": 0,
+      "edge": 300,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "6b64a596381a40b451bc8a97180adfdcf8f759a620545818220102ca37a3cffe"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 121,
+      "radius": 8,
+      "edge": 300,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "8decde1e14b1fdde2ad7c1136a497acb607c02c23e5704c2b18c4272e7842de1"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 359,
+      "radius": 40,
+      "edge": 300,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "48770325abf6782b59a60eaf86c41f3849d525f629914f10913d91abe5bd2ced"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 359,
+      "radius": 200,
+      "edge": 300,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "4aafcbd15e616982e1b059237f6e68761e25bee1ef3a81712784da784952a55a"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 359,
+      "radius": 0,
+      "edge": 0.5,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "15d29e77043c177bfc384264caf518d71da3f30321d9bf634972b8b1e3d5383a"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 359,
+      "radius": 8,
+      "edge": 0.5,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "c714ebe6149420b602564b7a32bb67a22720358aabdaadc32c194f1509da5397"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 359,
+      "radius": 40,
+      "edge": 0.5,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "941a80f92fb6dadb99e5606921af742d79e2356e9f59c23fc7b71b33afbba540"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 359,
+      "radius": 200,
+      "edge": 0.5,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 1.5
+    },
+    "sha256": "24bb4ce1fcdd72b07c6453dbbf421193bc780ee2d002448c4c5fedc0bdecba4b"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 1,
+      "radius": 0,
+      "edge": 8,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "4803cbf6ab09ffd52d1fb744596a95bafd6b535a23645beec5184c1173925b5c"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 1,
+      "radius": 8,
+      "edge": 8,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "5136ed79268737630d46984c218374a9bfa652eeb444f27748185a1eec523906"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 1,
+      "radius": 40,
+      "edge": 8,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "024a2b1a8b939c1c00ba62097bd5a66eead33390a77751279b4bee7cea3d61fd"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 1,
+      "radius": 200,
+      "edge": 8,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "51fd0604e5342c421cffc8bc155e77f9da00ce741026a0f61f8f05ad709604a7"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 1,
+      "radius": 0,
+      "edge": 20,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "4d210c37bbfa954a8991a4e9ebe7df8bab431503562eb92e4ed20dd9cf1e2ae0"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 1,
+      "radius": 8,
+      "edge": 20,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "99c937ada8cfa59c1be7f2e31ba1df3ed83a10aeb42778409226bdac2fb93998"
+  },
+  {
+    "options": {
+      "width": 1,
+      "height": 3,
+      "radius": 40,
+      "edge": 20,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "94c4c103bed26a19b00b0c915986342ed63034514ed7c98ddc11ca2593b5d54a"
+  },
+  {
+    "options": {
+      "width": 2,
+      "height": 3,
+      "radius": 200,
+      "edge": 20,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "1798cdc94b549f3b12fda2fb9a7340ec7327b1ee43f4791ce3684b7a2ee79264"
+  },
+  {
+    "options": {
+      "width": 17,
+      "height": 3,
+      "radius": 0,
+      "edge": 300,
+      "curvature": 0,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "61530f2d2a39be7d27fc9bd8b14380a2310dd52971f203065a10ed06a95c8ec6"
+  },
+  {
+    "options": {
+      "width": 200,
+      "height": 3,
+      "radius": 8,
+      "edge": 300,
+      "curvature": 0.2,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "4e03a4245f81bac1a529a67b5d86d88b4f33f360be315d7a7cace79ee60e7000"
+  },
+  {
+    "options": {
+      "width": 203,
+      "height": 3,
+      "radius": 40,
+      "edge": 300,
+      "curvature": 0.49,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "29a1227b862130bca48bcf53393c88ce88c8d93faceb8c868efa4fcbf78f9b46"
+  },
+  {
+    "options": {
+      "width": 641,
+      "height": 3,
+      "radius": 200,
+      "edge": 300,
+      "curvature": 1,
+      "strength": 1,
+      "dpr": 2
+    },
+    "sha256": "a2ed059f26d533b11837a92449f496f5a0b60dadab9c5ff591899414f7ee37ab"
+  }
+]

@@ -26,6 +26,10 @@ import {
 
 /** LRU size of the glyph raster cache (data URLs only, no pixel buffers). */
 export const GLYPH_RASTER_CACHE_LIMIT = 128;
+/** Retained encoded glyphs, in addition to the entry-count limit. */
+export const GLYPH_RASTER_CACHE_BYTES = 32 * 1024 * 1024;
+/** EDT needs many arrays per pixel; reject pathological tiles before allocating. */
+export const MAX_GLYPH_RASTER_PIXELS = 4 * 1024 * 1024;
 
 /** Ink padding (CSS px) around every glyph tile: room for the ring band. */
 export const GLYPH_TILE_PADDING = 3;
@@ -58,9 +62,8 @@ const EDT_INF = 1e12;
  * Felzenszwalb & Huttenlocher exact squared-distance transform of one line,
  * including the index of the nearest feature pixel (argmin).
  */
-function edt1d(f: Float64Array, n: number, dist: Float64Array, arg: Int32Array): void {
-  const v = new Int32Array(n);
-  const z = new Float64Array(n + 1);
+function edt1d(f: Float64Array, n: number, dist: Float64Array, arg: Int32Array,
+  v: Int32Array, z: Float64Array): void {
   let k = 0;
   v[0] = 0;
   z[0] = -EDT_INF;
@@ -111,11 +114,13 @@ function distanceTransform2d(
   const line = new Float64Array(Math.max(width, height));
   const lineOut = new Float64Array(Math.max(width, height));
   const lineArg = new Int32Array(Math.max(width, height));
+  const vertices = new Int32Array(line.length);
+  const boundaries = new Float64Array(line.length + 1);
 
   // Pass 1: columns. Every column has at least one feature (the padded ring).
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) line[y] = mask[x * height + y] ? 0 : EDT_INF;
-    edt1d(line, height, lineOut, lineArg);
+    edt1d(line, height, lineOut, lineArg, vertices, boundaries);
     for (let y = 0; y < height; y++) {
       colDist[x * height + y] = lineOut[y];
       if (withArgmin) colArg[x * height + y] = lineArg[y];
@@ -125,7 +130,7 @@ function distanceTransform2d(
   // Pass 2: rows over the column distances.
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) line[x] = colDist[x * height + y];
-    edt1d(line, width, lineOut, lineArg);
+    edt1d(line, width, lineOut, lineArg, vertices, boundaries);
     for (let x = 0; x < width; x++) {
       dist[x * height + y] = lineOut[x];
       if (argX) argX[x * height + y] = lineArg[x];
@@ -141,9 +146,11 @@ function rowDistance(mask: Uint8Array, width: number, height: number): Float64Ar
   const line = new Float64Array(width);
   const lineOut = new Float64Array(width);
   const lineArg = new Int32Array(width);
+  const vertices = new Int32Array(width);
+  const boundaries = new Float64Array(width + 1);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) line[x] = mask[x * height + y] ? 0 : EDT_INF;
-    edt1d(line, width, lineOut, lineArg);
+    edt1d(line, width, lineOut, lineArg, vertices, boundaries);
     for (let x = 0; x < width; x++) dist[x * height + y] = lineOut[x];
   }
   return dist;
@@ -172,6 +179,10 @@ function computeGlyphField(
   threshold: number,
   wantNormals: boolean,
 ): GlyphField {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 ||
+    (width + 2) * (height + 2) > MAX_GLYPH_RASTER_PIXELS) {
+    throw new RangeError('nico-glass-kit: glyph tile exceeds the safe allocation limit');
+  }
   const pw = width + 2;
   const ph = height + 2;
   const n = pw * ph;
@@ -195,8 +206,8 @@ function computeGlyphField(
   const rows = wantNormals ? rowDistance(outside, pw, ph) : null;
 
   const sdf = new Float32Array(width * height);
-  const nx = new Float32Array(width * height);
-  const ny = new Float32Array(width * height);
+  const nx = new Float32Array(wantNormals ? width * height : 0);
+  const ny = new Float32Array(wantNormals ? width * height : 0);
   let maxInside = 0;
 
   for (let y = 0; y < height; y++) {
@@ -614,6 +625,7 @@ interface GlyphRasterCacheStats {
   generated: number;
   evictions: number;
   size: number;
+  bytes: number;
 }
 
 export type GlyphRasterObserver = (raster: GlyphRaster) => void;
@@ -626,7 +638,9 @@ export function setGlyphRasterObserver(next: GlyphRasterObserver | null): void {
 }
 
 const cache = new Map<string, GlyphRaster>();
-const stats: GlyphRasterCacheStats = { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0 };
+const stats: GlyphRasterCacheStats = { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 };
+const rasterBytes = (raster: GlyphRaster): number =>
+  (raster.maskUrl.length + raster.ringUrl.length + raster.glintUrl.length + raster.mapUrl.length) * 2;
 
 export function glyphRasterCacheStats(): GlyphRasterCacheStats {
   return { ...stats, size: cache.size };
@@ -635,6 +649,7 @@ export function glyphRasterCacheStats(): GlyphRasterCacheStats {
 export function clearGlyphRasterCache(): void {
   cache.clear();
   stats.size = 0;
+  stats.bytes = 0;
 }
 
 /** Stable cache key: everything the raster depends on. */
@@ -668,7 +683,7 @@ function renderAlphaToDataUrl(
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-  const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
     if (!ctx) return '';
     const image = ctx.createImageData(width, height);
     const data = image.data;
@@ -690,6 +705,8 @@ function rasteriseGlyph(options: GlyphRasterOptions): Omit<GlyphRaster, 'key'> |
   const quality = clamp(options.dpr ?? 1, 0.25, 4);
   const pixelWidth = Math.max(1, Math.round(options.width * quality));
   const pixelHeight = Math.max(1, Math.round(options.height * quality));
+  if (!Number.isFinite(pixelWidth) || !Number.isFinite(pixelHeight) ||
+    (pixelWidth + 2) * (pixelHeight + 2) > MAX_GLYPH_RASTER_PIXELS) return null;
 
   const canvas = document.createElement('canvas');
   canvas.width = pixelWidth;
@@ -762,12 +779,13 @@ function rasteriseGlyph(options: GlyphRasterOptions): Omit<GlyphRaster, 'key'> |
  */
 export function generateGlyphRaster(options: GlyphRasterOptions): GlyphRaster | null {
   const key = glyphRasterCacheKey(options);
-  const cached = cache.get(key);
+  const storageKey = `${key}:${options.skipDataUrl ? 'raw' : 'png'}`;
+  const cached = cache.get(storageKey);
   if (cached) {
     stats.hits++;
     // Refresh LRU recency.
-    cache.delete(key);
-    cache.set(key, cached);
+    cache.delete(storageKey);
+    cache.set(storageKey, cached);
     return cached;
   }
   if (typeof document === 'undefined') return null;
@@ -785,10 +803,12 @@ export function generateGlyphRaster(options: GlyphRasterOptions): GlyphRaster | 
 
   const result: GlyphRaster = { key, ...raster };
   stats.generated++;
-  cache.set(key, result);
-  if (cache.size > GLYPH_RASTER_CACHE_LIMIT) {
+  cache.set(storageKey, result);
+  stats.bytes += rasterBytes(result);
+  while (cache.size > GLYPH_RASTER_CACHE_LIMIT || stats.bytes > GLYPH_RASTER_CACHE_BYTES) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) {
+      stats.bytes -= rasterBytes(cache.get(oldest)!);
       cache.delete(oldest);
       stats.evictions++;
     }

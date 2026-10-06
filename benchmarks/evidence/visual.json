@@ -1,0 +1,110 @@
+[
+  {
+    "name": "normal",
+    "before": "baseline/animated-25.png",
+    "after": "final-v2/animated-25.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 12707,
+    "changedPercent": 0.2451195987654321,
+    "aboveOne": 7985,
+    "maxChannelDelta": 17,
+    "meanAbsoluteChannelDelta": 0.0023537165637860084
+  },
+  {
+    "name": "dense-settled",
+    "before": "comparison/dense-settled-baseline.png",
+    "after": "comparison/dense-settled-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 12957,
+    "changedPercent": 0.24994212962962964,
+    "aboveOne": 8448,
+    "maxChannelDelta": 17,
+    "meanAbsoluteChannelDelta": 0.002472672325102881
+  },
+  {
+    "name": "hover",
+    "before": "comparison/hover-baseline.png",
+    "after": "comparison/hover-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 12765,
+    "changedPercent": 0.24623842592592593,
+    "aboveOne": 8054,
+    "maxChannelDelta": 21,
+    "meanAbsoluteChannelDelta": 0.002761188271604938
+  },
+  {
+    "name": "group-hover",
+    "before": "comparison/group-hover-baseline.png",
+    "after": "comparison/group-hover-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 150,
+      "width": 1100,
+      "height": 700
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 12423,
+    "changedPercent": 0.23964120370370373,
+    "aboveOne": 7492,
+    "maxChannelDelta": 24,
+    "meanAbsoluteChannelDelta": 0.002624292695473251
+  },
+  {
+    "name": "glyph",
+    "before": "comparison/glyph-baseline.png",
+    "after": "comparison/glyph-optimized.png",
+    "crop": {
+      "x": 40,
+      "y": 1390,
+      "width": 1250,
+      "height": 340
+    },
+    "width": 2880,
+    "height": 1800,
+    "changedPixels": 12707,
+    "changedPercent": 0.2451195987654321,
+    "aboveOne": 7985,
+    "maxChannelDelta": 17,
+    "meanAbsoluteChannelDelta": 0.0023537165637860084
+  },
+  {
+    "name": "4k",
+    "before": "baseline/4k-quality-25.png",
+    "after": "final-v2/4k-quality-25.png",
+    "crop": {
+      "x": 20,
+      "y": 70,
+      "width": 1520,
+      "height": 350
+    },
+    "width": 3840,
+    "height": 2160,
+    "changedPixels": 3120,
+    "changedPercent": 0.03761574074074074,
+    "aboveOne": 1994,
+    "maxChannelDelta": 14,
+    "meanAbsoluteChannelDelta": 0.0007649337705761316
+  }
+]

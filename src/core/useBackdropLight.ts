@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { decideLight, probeBackdropLight } from './backdropProbe';
+import { decideLight, probeBackdropLight, probeBackdropLightSteps, type BackdropProbe } from './backdropProbe';
 import { invalidateProbe, subscribeProbe, type ProbeTarget } from './backdropProbeScheduler';
+import { observeResize } from './observeResize';
 
 export interface ElementRefLike {
   current: HTMLElement | null;
@@ -31,44 +32,45 @@ export function useBackdropLight(ref: ElementRefLike | null, enabled: boolean): 
       return;
     }
 
+    const applyProbe = (probe: BackdropProbe | null) => {
+      if (!probe) return; // offscreen / not measurable — keep the last decision
+      if (probe.averageLuminance === null) {
+        // Backdrop unreadable (e.g. a cross-origin iframe): fall back to
+        // prefers-color-scheme until a readable backdrop returns.
+        if (decisionRef.current !== null) {
+          decisionRef.current = null;
+          setLight(null);
+        }
+        return;
+      }
+      const next = decideLight(probe.averageLuminance, decisionRef.current);
+      if (next !== decisionRef.current) {
+        decisionRef.current = next;
+        setLight(next);
+      }
+    };
     const target: ProbeTarget = {
-      get el() {
-        return ref?.current ?? null;
-      },
-      run: () => {
+      get el() { return ref?.current ?? null; },
+      run() {
         const el = ref?.current;
-        if (!el || !el.isConnected || document.hidden) return;
-        const probe = probeBackdropLight(el);
-        if (!probe) return; // offscreen / not measurable — keep the last decision
-        if (probe.averageLuminance === null) {
-          // Backdrop unreadable (e.g. a cross-origin iframe): fall back to
-          // prefers-color-scheme until a readable backdrop returns.
-          if (decisionRef.current !== null) {
-            decisionRef.current = null;
-            setLight(null);
-          }
-          return;
-        }
-        const next = decideLight(probe.averageLuminance, decisionRef.current);
-        if (next !== decisionRef.current) {
-          decisionRef.current = next;
-          setLight(next);
-        }
+        if (el?.isConnected && !document.hidden) applyProbe(probeBackdropLight(el));
+      },
+      *createTask() {
+        const el = ref?.current;
+        if (!el?.isConnected || document.hidden) return;
+        const probe = yield* probeBackdropLightSteps(el);
+        if (el.isConnected && !document.hidden) applyProbe(probe);
       },
     };
 
     const unsubscribe = subscribeProbe(target);
 
     const observed = ref?.current;
-    const observer =
-      typeof ResizeObserver !== 'undefined' && observed
-        ? new ResizeObserver(() => invalidateProbe(target))
-        : null;
-    if (observer && observed) observer.observe(observed);
+    const unobserve = observed ? observeResize(observed, () => invalidateProbe(target)) : undefined;
 
     return () => {
       unsubscribe();
-      observer?.disconnect();
+      unobserve?.();
     };
   }, [enabled, ref]);
 

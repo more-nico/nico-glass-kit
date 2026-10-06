@@ -14,6 +14,8 @@ import { GlassConfigContext } from '../core/GlassProvider';
 import { DEFAULT_OPTICS, resolveOptics } from '../core/optics';
 import { lensDisplacementScale } from '../core/displacementMap';
 import { DISPERSION_SCALE_EPSILON } from '../core/lensFilter';
+import { observeResize } from '../core/observeResize';
+import { useGlassDpr } from '../core/useGlassDpr';
 import {
   DEFAULT_GLYPH_RING_WIDTH,
   clearGlyphRasterCache,
@@ -128,14 +130,7 @@ export function GlassText(props: GlassTextProps) {
   const [probeVersion, setProbeVersion] = useState(0);
 
   const normalised = useMemo(() => normaliseText(text), [text]);
-  const [dpr, setDpr] = useState(
-    () => (typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2)),
-  );
-  useEffect(() => {
-    const updateDpr = () => setDpr(Math.min(window.devicePixelRatio || 1, 2));
-    window.addEventListener('resize', updateDpr);
-    return () => window.removeEventListener('resize', updateDpr);
-  }, []);
+  const dpr = useGlassDpr();
 
   const { depth, curvature, refraction, blur, dispersion } = material;
   const lensMapRasterScale = provider.lensMapRasterScale;
@@ -257,9 +252,7 @@ export function GlassText(props: GlassTextProps) {
   useEffect(() => {
     const probe = probeRef.current;
     if (!probe || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => setProbeVersion((version) => version + 1));
-    ro.observe(probe);
-    return () => ro.disconnect();
+    return observeResize(probe, () => setProbeVersion((version) => version + 1));
   }, []);
 
   const ready = state !== null && state.text === normalised;

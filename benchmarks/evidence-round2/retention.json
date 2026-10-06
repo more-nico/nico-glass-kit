@@ -1,0 +1,108 @@
+[
+  {
+    "label": "baseline",
+    "mounted": {
+      "heap": {
+        "usedSize": 5204936,
+        "totalSize": 5828608,
+        "embedderHeapUsedSize": 7031640,
+        "backingStorageSize": 363812
+      },
+      "dom": {
+        "documents": 1,
+        "nodes": 3207,
+        "jsEventListeners": 522
+      },
+      "stats": {
+        "cache": {
+          "hits": 91,
+          "misses": 21,
+          "generated": 21,
+          "evictions": 0,
+          "size": 21,
+          "bytes": 60972
+        },
+        "filters": 121,
+        "surfaces": 121
+      }
+    },
+    "unmounted": {
+      "heap": {
+        "usedSize": 3702956,
+        "totalSize": 4517888,
+        "embedderHeapUsedSize": 2431624,
+        "backingStorageSize": 380375
+      },
+      "dom": {
+        "documents": 1,
+        "nodes": 29,
+        "jsEventListeners": 152
+      },
+      "stats": {
+        "cache": {
+          "hits": 2598,
+          "misses": 520,
+          "generated": 520,
+          "evictions": 488,
+          "size": 32,
+          "bytes": 93584
+        },
+        "filters": 0,
+        "surfaces": 0
+      }
+    }
+  },
+  {
+    "label": "optimized",
+    "mounted": {
+      "heap": {
+        "usedSize": 5251644,
+        "totalSize": 5828608,
+        "embedderHeapUsedSize": 6961856,
+        "backingStorageSize": 368818
+      },
+      "dom": {
+        "documents": 1,
+        "nodes": 3207,
+        "jsEventListeners": 522
+      },
+      "stats": {
+        "cache": {
+          "hits": 91,
+          "misses": 21,
+          "generated": 21,
+          "evictions": 0,
+          "size": 21,
+          "bytes": 60972
+        },
+        "filters": 121,
+        "surfaces": 121
+      }
+    },
+    "unmounted": {
+      "heap": {
+        "usedSize": 3779412,
+        "totalSize": 4780032,
+        "embedderHeapUsedSize": 2414288,
+        "backingStorageSize": 385396
+      },
+      "dom": {
+        "documents": 1,
+        "nodes": 29,
+        "jsEventListeners": 152
+      },
+      "stats": {
+        "cache": {
+          "hits": 2577,
+          "misses": 522,
+          "generated": 522,
+          "evictions": 490,
+          "size": 32,
+          "bytes": 93584
+        },
+        "filters": 0,
+        "surfaces": 0
+      }
+    }
+  }
+]

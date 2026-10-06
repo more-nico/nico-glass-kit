@@ -32,17 +32,24 @@
     "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "playwright test --config benchmarks/playwright.config.ts",
+    "bench:build": "vite build benchmarks --config benchmarks/vite.config.ts",
+    "bench:serve": "vite preview benchmarks --config benchmarks/vite.config.ts --host 127.0.0.1 --port 4178 --strictPort",
+    "bench:run": "node benchmarks/run.mjs",
+    "bench:compare": "node benchmarks/compare.mjs"
   },
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "pngjs": "^7.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "~5.6.3",

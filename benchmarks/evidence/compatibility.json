@@ -1,0 +1,56 @@
+[
+  {
+    "name": "firefox",
+    "version": "155.0",
+    "states": [
+      {
+        "label": "baseline",
+        "qualities": [
+          "low"
+        ],
+        "filters": 0,
+        "backdrop": "blur(3px) saturate(1) brightness(1.1)",
+        "glyphReady": true,
+        "errors": []
+      },
+      {
+        "label": "optimized",
+        "qualities": [
+          "low"
+        ],
+        "filters": 0,
+        "backdrop": "blur(3px) saturate(1) brightness(1.1)",
+        "glyphReady": true,
+        "errors": []
+      }
+    ],
+    "passed": true
+  },
+  {
+    "name": "webkit",
+    "version": "26.6",
+    "states": [
+      {
+        "label": "baseline",
+        "qualities": [
+          "low"
+        ],
+        "filters": 0,
+        "backdrop": "blur(3px) saturate(1) brightness(1.1)",
+        "glyphReady": true,
+        "errors": []
+      },
+      {
+        "label": "optimized",
+        "qualities": [
+          "low"
+        ],
+        "filters": 0,
+        "backdrop": "blur(3px) saturate(1) brightness(1.1)",
+        "glyphReady": true,
+        "errors": []
+      }
+    ],
+    "passed": true
+  }
+]

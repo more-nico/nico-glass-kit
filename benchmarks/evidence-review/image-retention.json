@@ -1,0 +1,30 @@
+{
+  "browser": "153.0.8010.12",
+  "collectedAt": "2026-10-06T03:20:35.645Z",
+  "results": [
+    {
+      "label": "previous",
+      "cycles": 40,
+      "retainedDecodedCopies": 12,
+      "heap": {
+        "usedSize": 3274704,
+        "totalSize": 4042752,
+        "embedderHeapUsedSize": 3079328,
+        "backingStorageSize": 8069898
+      },
+      "errors": []
+    },
+    {
+      "label": "optimized",
+      "cycles": 40,
+      "retainedDecodedCopies": 12,
+      "heap": {
+        "usedSize": 3476396,
+        "totalSize": 4042752,
+        "embedderHeapUsedSize": 2997264,
+        "backingStorageSize": 8071006
+      },
+      "errors": []
+    }
+  ]
+}

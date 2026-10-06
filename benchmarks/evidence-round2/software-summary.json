@@ -1,0 +1,96 @@
+{
+  "before": {
+    "browser": "153.0.8010.12",
+    "repetitions": 3,
+    "durationMs": 5000
+  },
+  "after": {
+    "browser": "153.0.8010.12",
+    "repetitions": 3,
+    "durationMs": 5000
+  },
+  "summaries": [
+    {
+      "name": "animated-25",
+      "before": {
+        "fps": 9.116312253448141,
+        "frameP50Ms": 116.69999999999982,
+        "frameP95Ms": 133.30000000000018,
+        "frameP99Ms": 133.5,
+        "mountMs": 297.80000001192093,
+        "mainThreadBusyPercent": 5.973760932902518,
+        "browserCPUHostPercent": 89.87074229933494,
+        "heapMiB": 6.686191558837891,
+        "layoutMs": 0,
+        "styleMs": 6.525000000000001,
+        "longTaskCount": 0,
+        "workingSetMiB": 671.6328125,
+        "gpuPercent": 0,
+        "gpuDedicatedMiB": 0
+      },
+      "after": {
+        "fps": 9.13151364764268,
+        "frameP50Ms": 116.69999999999982,
+        "frameP95Ms": 116.80000000000109,
+        "frameP99Ms": 116.90000000000146,
+        "mountMs": 278.80000001192093,
+        "mainThreadBusyPercent": 6.090665926939189,
+        "browserCPUHostPercent": 90.03789304706733,
+        "heapMiB": 5.997467041015625,
+        "layoutMs": 0,
+        "styleMs": 5.986999999999999,
+        "longTaskCount": 0,
+        "workingSetMiB": 671.44140625,
+        "gpuPercent": 0,
+        "gpuDedicatedMiB": 0
+      },
+      "visual": {
+        "changedPixels": 0,
+        "changedPercent": 0,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0
+      }
+    },
+    {
+      "name": "4k-quality-25",
+      "before": {
+        "fps": 4.7713717693836974,
+        "frameP50Ms": 210.69999998807907,
+        "frameP95Ms": 216.90000000000055,
+        "frameP99Ms": 216.90000000000055,
+        "mountMs": 335,
+        "mainThreadBusyPercent": 2.9754027368853997,
+        "browserCPUHostPercent": 90.45540076606623,
+        "heapMiB": 5.429603576660156,
+        "layoutMs": 0,
+        "styleMs": 1.5910000000000004,
+        "longTaskCount": 0,
+        "workingSetMiB": 715.171875,
+        "gpuPercent": 0,
+        "gpuDedicatedMiB": 0
+      },
+      "after": {
+        "fps": 4.799938560808394,
+        "frameP50Ms": 200.20000000000073,
+        "frameP95Ms": 216.90000000000055,
+        "frameP99Ms": 216.90000000000055,
+        "mountMs": 337.7999999523163,
+        "mainThreadBusyPercent": 3.0305660087689605,
+        "browserCPUHostPercent": 91.05590934065944,
+        "heapMiB": 6.467094421386719,
+        "layoutMs": 0,
+        "styleMs": 1.6139999999999992,
+        "longTaskCount": 0,
+        "workingSetMiB": 721.40625,
+        "gpuPercent": 0,
+        "gpuDedicatedMiB": 0
+      },
+      "visual": {
+        "changedPixels": 0,
+        "changedPercent": 0,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0
+      }
+    }
+  ]
+}

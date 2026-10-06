@@ -2,6 +2,60 @@
 
 ## Unreleased
 
+### Performance
+
+- Preserve lens geometry, full-resolution field encoding, dispersion, blur,
+  raster scale and CSS layers while computing only non-neutral bevel pixels.
+- Cache runtime PNGs without full RGBA buffers; bound lens cache retention by
+  both entries and bytes, reuse images across refraction strengths and avoid
+  caching failed encodes. CPU Canvas PNG generation avoids GPU readback stalls
+  during resize, with tiny backend rounding differences at the rim.
+- Batch SVG graph registration with O(1) reference counts, memoize unchanged
+  graphs, release mutable node references and avoid filter-id hash collisions.
+- Share immutable High-tier filters, ResizeObserver and DPR/scheme subscriptions;
+  coalesce pointer bursts and group bounds reads to one update per frame.
+- Share backdrop DOM reads within each frame, snapshot scroll offsets once,
+  prune detached scrollers and suspend scheduled probes while hidden. Budget
+  native probes using their measured cost and rotate the queue to avoid
+  starving later surfaces under sustained mutations.
+- Resume slow backdrop probes between sample points while draining cheap grids
+  together. Keep all nine samples and group area weights; under load samples can
+  span adjacent frames and automatic tint decisions may arrive later.
+- Amortize first-hit/layout cost in continuation slices and prioritize actual
+  colour/image changes, discarding stale partial samples. Use 6 ms normal,
+  16 ms continuation and 32 ms paint-change soft budgets to balance rendering
+  throughput with tint responsiveness.
+- Skip unpainted geometry reads and stop behind opaque painted backgrounds,
+  including unreadable content hidden behind those backgrounds.
+- Share a native animation callback across springs, glints and pointer reads.
+- Reuse glyph distance-transform scratch arrays with byte-identical fields,
+  normals and ring masks; bound glyph PNG caching to 128 entries / 32 MiB.
+- Bound decoded background image retention to 32 entries / an estimated 64 MiB,
+  retaining one oversized image to prevent repeated decoding.
+
+### Fixed
+
+- Bind animation setters to their filter id so cleanup of a replaced graph
+  cannot overwrite the new material's refraction scale.
+- Track DPR changes on monitor/zoom changes, including unchanged CSS dimensions.
+- Reject non-finite or pathological lens dimensions before allocating buffers;
+  retain the existing CSS fallback on canvas/allocation failure.
+- Reject glyph rasters above 4 Mi physical pixels including field padding before distance-transform
+  allocation, preserving the existing readable text fallback.
+- Prevent decode/probe loops when simultaneously visible background images exceed
+  the decoded-image LRU. Retain exact sampled colours per painted node without
+  retaining image buffers, and queue private image decodes with concurrency four.
+  Geometry changes request new samples; no average replaces precise point sampling.
+
+### Tests
+
+- Add a production benchmark with raw CPU/GPU/memory metrics, frozen lens pixel
+  hashes, screenshot diffs and browser coverage for StrictMode, hover, resize,
+  optics/DPR updates, glyphs, filter cleanup and fallbacks. See `benchmarks/`.
+- Add frozen glyph hashes, slow native hit-test scheduling, animation batching
+  and decoded-image churn regressions. Preserve the first-round evidence and
+  record same-condition second-round results in `benchmarks/report-round2.md`.
+
 ## 0.3.2
 
 ### Changed

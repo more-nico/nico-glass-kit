@@ -23,10 +23,18 @@
  * node tests; only the bottom section touches the DOM.
  */
 
-import { invalidateBackdropPaintInfo, onImagesSettled } from './backdropProbe';
+import { consumeBackdropPaintChange, invalidateBackdropPaintInfo, onImagesSettled, withBackdropProbeBatch } from './backdropProbe';
 
 const PROBE_THROTTLE_MS = 120;
 const PROBE_BUDGET_MS = 6;
+// Resuming every point in a fresh frame repeats the costly first hit-test and
+// style flush. Give an unfinished grid a slightly larger catch-up slice, then
+// measure its cheaper continuation points. Keep the complete nine-point result
+// responsive instead of trading multi-second tint lag for smoother rAF numbers.
+const PROBE_CATCHUP_BUDGET_MS = 16;
+// Actual paint changes get a larger slice so new colours/images are not held
+// behind a slowly sampled motion queue. Native calls remain indivisible.
+const PROBE_PAINT_BUDGET_MS = 32;
 const INTERNAL_ATTR = 'data-ngs-internal';
 /**
  * A `data-ngs-light` flip animates the tint over `--ngs-transition` (240 ms).
@@ -48,6 +56,8 @@ export interface ProbeTarget {
   readonly region?: () => ScrollRect | null;
   /** Probe + Light/Dark decision; keeps its own hidden/offscreen guards. */
   run(): void;
+  /** Optional resumable probe; one next() performs at most one native hit-test. */
+  createTask?(): Iterator<void, void>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -170,6 +180,14 @@ interface TargetEntry {
   lastRunAt: number;
   trailing: number | undefined;
   lastCheck: CheckSnapshot | null;
+  lastProbeCostMs: number;
+  task: Iterator<void, void> | null;
+  taskCostMs: number;
+  lastRunCostMs: number;
+  taskSteps: number;
+  lastStepCount: number;
+  continuationCostMs: number;
+  urgent: boolean;
 }
 
 const entries = new Map<ProbeTarget, TargetEntry>();
@@ -179,6 +197,9 @@ let rafId = 0;
 let lightSettleTimer = 0;
 let mutationObserver: MutationObserver | null = null;
 let unsubscribeImages: (() => void) | null = null;
+let batchOffsets: Map<unknown, ScrollOffset> | null = null;
+let scrollBatchActive = false;
+let batchCursor = 0;
 
 const now = (): number => performance.now();
 
@@ -216,6 +237,7 @@ function stopListening(): void {
     lightSettleTimer = 0;
   }
   activeScrollers.clear();
+  batchCursor = 0;
 }
 
 function onScroll(event: Event): void {
@@ -224,11 +246,15 @@ function onScroll(event: Event): void {
   scheduleBatch();
 }
 
-function onGenericTrigger(): void {
+function onGenericTrigger(event?: Event, urgent = true): void {
   // Mutations/resizes may have changed what elements paint; the probe's
   // per-node background analysis cache must not outlive that.
   invalidateBackdropPaintInfo();
-  for (const entry of entries.values()) entry.needsRun = true;
+  for (const entry of entries.values()) {
+    if (event?.type === 'visibilitychange') { entry.task?.return?.(); entry.task = null; }
+    if (urgent) { entry.task?.return?.(); entry.task = null; entry.urgent = true; }
+    entry.needsRun = true;
+  }
   scheduleBatch();
 }
 
@@ -240,7 +266,10 @@ function onMutations(records: MutationRecord[]): void {
     scheduleSettledTrigger();
     return;
   }
-  onGenericTrigger();
+  // Class/tree changes can replace paint directly. Inline style mutations are
+  // often just transforms; compare the paint during the next actual sample.
+  onGenericTrigger(undefined, records.some(record => !isInternalMutation(record) &&
+    (record.type !== 'attributes' || record.attributeName !== 'style')));
 }
 
 function scheduleSettledTrigger(): void {
@@ -248,17 +277,18 @@ function scheduleSettledTrigger(): void {
   if (lightSettleTimer) window.clearTimeout(lightSettleTimer);
   lightSettleTimer = window.setTimeout(() => {
     lightSettleTimer = 0;
-    onGenericTrigger();
+    onGenericTrigger(undefined, false);
   }, LIGHT_SETTLE_MS);
 }
 
 function scheduleBatch(): void {
-  if (rafId || typeof requestAnimationFrame === 'undefined') return;
+  if (rafId || typeof requestAnimationFrame === 'undefined' || document.hidden) return;
   rafId = requestAnimationFrame(runBatch);
 }
 
 function hasRunnableWork(): boolean {
   for (const entry of entries.values()) {
+    if (entry.task) return true;
     if (entry.scrollPending) return true;
     if (entry.needsRun && entry.trailing === undefined) return true;
   }
@@ -267,40 +297,152 @@ function hasRunnableWork(): boolean {
 
 function runBatch(): void {
   rafId = 0;
+  if (document.hidden) return;
+  if (consumeBackdropPaintChange()) promotePaintChange();
   const start = now();
-  for (const entry of [...entries.values()]) {
-    if (!entry.needsRun && !entry.scrollPending) continue;
-    if (now() - start > PROBE_BUDGET_MS) break;
-    if (entry.scrollPending) decideScroll(entry);
-    if (entry.needsRun) tryRun(entry);
-  }
+  // Reading scrollY can flush layout. A wholly throttled batch must do no DOM
+  // reads; take the shared snapshot lazily on its first real probe/scroll check.
+  scrollBatchActive = true;
+  try {
+    withBackdropProbeBatch(() => {
+      const work = [...entries.values()];
+      const first = batchCursor % Math.max(1, work.length);
+      let ranProbe = false;
+      for (let checked = 0; checked < work.length; checked++) {
+        const index = (first + checked) % work.length;
+        const entry = work[index];
+        if (!entry.needsRun && !entry.scrollPending && !entry.task) continue;
+        batchCursor = index;
+        if (now() - start > PROBE_BUDGET_MS) break;
+        if (entry.scrollPending) decideScroll(entry);
+        if (entry.task || (entry.needsRun && entry.trailing === undefined)) {
+          // A slow native hit-test is indivisible. Learn its cost and avoid
+          // starting a second expensive probe that would overrun this frame.
+          // Resume from that entry next frame so late subscribers cannot starve.
+          const predicted = !entry.task && entry.lastRunCostMs > 0 && entry.lastRunCostMs <= PROBE_BUDGET_MS
+            ? entry.lastRunCostMs : entry.lastProbeCostMs;
+          if (ranProbe && now() - start + predicted > PROBE_BUDGET_MS) break;
+          ranProbe = tryRun(entry, start + PROBE_BUDGET_MS) || ranProbe;
+          if (entry.task) break; // Resume this finite grid before rotating on.
+        }
+        batchCursor = (index + 1) % work.length;
+      }
+    });
+  } finally { batchOffsets = null; scrollBatchActive = false; }
   if (hasRunnableWork()) scheduleBatch();
 }
 
-function tryRun(entry: TargetEntry): void {
-  const elapsed = now() - entry.lastRunAt;
-  if (elapsed >= PROBE_THROTTLE_MS) {
+function tryRun(entry: TargetEntry, deadline: number): boolean {
+  const batchStart = deadline - PROBE_BUDGET_MS;
+  const resuming = entry.task !== null;
+  if (entry.urgent) deadline = batchStart + PROBE_PAINT_BUDGET_MS;
+  else if (resuming) deadline = batchStart + PROBE_CATCHUP_BUDGET_MS;
+  const fastCandidate = !entry.task && entry.lastRunCostMs > 0 && entry.lastRunCostMs <= PROBE_BUDGET_MS;
+  if (!entry.task) {
+    const elapsed = now() - entry.lastRunAt;
+    if (elapsed < PROBE_THROTTLE_MS) {
+      if (entry.trailing === undefined) {
+        entry.trailing = window.setTimeout(() => {
+          entry.trailing = undefined;
+          scheduleBatch();
+        }, PROBE_THROTTLE_MS - elapsed);
+      }
+      return false;
+    }
     entry.lastRunAt = now();
     entry.needsRun = false;
+    if (entry.target.createTask) {
+      entry.task = entry.target.createTask();
+      entry.taskCostMs = 0;
+      entry.taskSteps = 0;
+      entry.continuationCostMs = 0;
+    }
+  }
+  if (entry.task) {
+    let ran = false;
+    while (entry.task) {
+      // The first point after a frame boundary includes a layout/style flush;
+      // its cost overestimates subsequent points sharing this batch's DOM reads.
+      // Explore one continuation in the catch-up slice, then use measured cost.
+      const predicted = resuming
+        ? entry.continuationCostMs || Math.min(entry.lastProbeCostMs, 2)
+        : entry.lastProbeCostMs;
+      if (now() >= deadline || (ran && now() + predicted > deadline)) break;
+      const start = now();
+      const step = entry.task.next();
+      const cost = now() - start;
+      if (ran) entry.continuationCostMs = cost;
+      entry.taskCostMs += cost;
+      if (consumeBackdropPaintChange()) {
+        // A fresh first sample already reads the new paint. A partly sampled
+        // old grid must restart so a black-to-white switch cannot average stale
+        // black samples into the new result. next() has returned, so cancellation
+        // cannot re-enter a running generator.
+        const keep = !step.done && entry.taskSteps === 0;
+        promotePaintChange(keep ? entry : undefined);
+        deadline = batchStart + PROBE_PAINT_BUDGET_MS;
+        if (!keep) { ran = true; break; }
+      }
+      if (step.done) {
+        completeTask(entry);
+      } else {
+        entry.taskSteps++;
+        entry.lastProbeCostMs = cost;
+        // Check this run's first point before taking the fast path. A device
+        // or DOM that suddenly slows down must not run a formerly cheap grid
+        // as one long task. Cheap known grids avoid clocks at every point.
+        const remaining = Math.max(entry.lastRunCostMs - cost, cost * (entry.lastStepCount - 1));
+        if (fastCandidate && entry.taskSteps === 1 &&
+          cost <= PROBE_BUDGET_MS / Math.max(1, entry.lastStepCount) && now() + remaining <= deadline) {
+          const drainStart = now();
+          let next = entry.task.next();
+          while (!next.done) { entry.taskSteps++; next = entry.task.next(); }
+          entry.taskCostMs += now() - drainStart;
+          completeTask(entry);
+        }
+      }
+      ran = true;
+    }
+    return ran;
+  } else {
+    const probeStart = now();
     entry.target.run();
     refreshCheck(entry);
-    return;
+    entry.lastProbeCostMs = now() - probeStart;
+    entry.lastRunCostMs = Math.max(0.001, entry.lastProbeCostMs);
+    entry.urgent = false;
+    return true;
   }
-  if (entry.trailing === undefined) {
-    entry.trailing = window.setTimeout(() => {
-      entry.trailing = undefined;
-      scheduleBatch();
-    }, PROBE_THROTTLE_MS - elapsed);
+}
+
+function completeTask(entry: TargetEntry): void {
+  entry.task = null;
+  entry.urgent = false;
+  entry.lastRunCostMs = Math.max(0.001, entry.taskCostMs);
+  entry.lastStepCount = entry.taskSteps;
+  refreshCheck(entry);
+}
+
+function promotePaintChange(keep?: TargetEntry): void {
+  for (const entry of entries.values()) {
+    entry.urgent = true;
+    if (entry !== keep) {
+      entry.task?.return?.(); entry.task = null;
+      entry.needsRun = true;
+    }
   }
 }
 
 function scrollerOffsets(): Map<unknown, ScrollOffset> {
+  if (batchOffsets) return batchOffsets;
   const offsets = new Map<unknown, ScrollOffset>();
   offsets.set(document, { top: window.scrollY, left: window.scrollX });
   for (const scroller of activeScrollers) {
     if (scroller === document || !(scroller instanceof Element)) continue;
+    if (!scroller.isConnected) { activeScrollers.delete(scroller); continue; }
     offsets.set(scroller, { top: scroller.scrollTop, left: scroller.scrollLeft });
   }
+  if (scrollBatchActive) batchOffsets = offsets;
   return offsets;
 }
 
@@ -308,7 +450,10 @@ function mergeOffsets(
   last: CheckSnapshot | null,
   fresh: Map<unknown, ScrollOffset>,
 ): Map<unknown, ScrollOffset> {
-  const merged = new Map(last?.offsets ?? []);
+  const merged = new Map<unknown, ScrollOffset>();
+  for (const [scroller, offset] of last?.offsets ?? []) {
+    if (!(scroller instanceof Element) || scroller.isConnected) merged.set(scroller, offset);
+  }
   for (const [scroller, offset] of fresh) merged.set(scroller, offset);
   return merged;
 }
@@ -380,6 +525,14 @@ export function subscribeProbe(target: ProbeTarget): () => void {
     lastRunAt: 0,
     trailing: undefined,
     lastCheck: null,
+    lastProbeCostMs: 0,
+    task: null,
+    taskCostMs: 0,
+    lastRunCostMs: 0,
+    taskSteps: 0,
+    lastStepCount: 0,
+    continuationCostMs: 0,
+    urgent: false,
   };
   entries.set(target, entry);
   startListening();
@@ -389,6 +542,7 @@ export function subscribeProbe(target: ProbeTarget): () => void {
     const existing = entries.get(target);
     if (!existing) return;
     if (existing.trailing !== undefined) window.clearTimeout(existing.trailing);
+    existing.task?.return?.();
     entries.delete(target);
     if (entries.size === 0) stopListening();
   };

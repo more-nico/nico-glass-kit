@@ -1,8 +1,8 @@
 /**
  * SVG filter registry: a hidden `<svg>` mounted by {@link GlassProvider} that
  * owns every `<filter>` node used by glass surfaces. Filters are keyed so
- * identical geometry/params share one node (Medium tier), while High tier
- * instances get private entries they can animate freely.
+ * identical geometry/params share one node (Medium and immutable High tier),
+ * while animated High instances get private entries they can retune freely.
  *
  * The graph is assembled from `lensFilter.ts` pass descriptors (ported from
  * the nicoGlassKit reference): feImage(map) → in-graph blur → saturate →
@@ -23,16 +23,16 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
+  useSyncExternalStore,
   type MutableRefObject,
   type ReactNode,
 } from 'react';
-import { generateLensMap, lensMapCacheKey, type LensMapOptions } from './displacementMap';
+import { generateLensMapImage, lensMapCacheKey, type LensMapOptions } from './displacementMap';
+import { createFilterStore, type FilterEntry } from './filterStore';
 import {
-  createLensFilter,
   LENS_FILTER_COLOR_INTERPOLATION,
   lensChannelMatrix,
-  lensPassScaleRatios,
-  lensRegionPercent,
   lensSaturationMatrix,
   type LensFilterPass,
 } from './lensFilter';
@@ -75,17 +75,6 @@ export interface GlassFilterPreset {
   height: number;
 }
 
-interface RegistryEntry {
-  id: string;
-  mapUrl: string;
-  width: number;
-  height: number;
-  passes: LensFilterPass[];
-  ratios: number[];
-  region: { x: string; y: string; width: string; height: string };
-  count: number;
-}
-
 interface RegistryApi {
   acquire(spec: GlassFilterSpec): string;
   release(id: string): void;
@@ -97,8 +86,8 @@ export const GlassFilterRegistryContext = createContext<RegistryApi | null>(null
 
 export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const [entries, setEntries] = useState<Map<string, RegistryEntry>>(new Map());
-  const idToKey = useRef(new Map<string, string>());
+  const [store] = useState(() => createFilterStore(uid));
+  const entries = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 
   // Mutable filter-graph nodes, indexed by filter id: the elasticity spring
   // retunes the feDisplacementMap scales and hover boosts retune the
@@ -111,85 +100,27 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   }
   const nodesRef = useRef(new Map<string, FilterNodes>());
 
-  const filterNodes = (id: string): FilterNodes => {
+  const filterNodes = useCallback((id: string): FilterNodes => {
     let nodes = nodesRef.current.get(id);
     if (!nodes) {
       nodes = { scale: new Map(), brightnessR: null, brightnessG: null, brightnessB: null };
       nodesRef.current.set(id, nodes);
     }
     return nodes;
-  };
+  }, []);
 
-  const idFor = useCallback(
-    (key: string) => {
-      let h = 5381;
-      for (let i = 0; i < key.length; i++) h = ((h << 5) + h + key.charCodeAt(i)) | 0;
-      return `ngs${uid}-${(h >>> 0).toString(36)}`;
-    },
-    [uid],
-  );
-
-  const acquire = useCallback(
-    (spec: GlassFilterSpec) => {
-      const id = idFor(spec.key);
-      idToKey.current.set(id, spec.key);
-      setEntries((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(spec.key);
-        if (existing) {
-          next.set(spec.key, { ...existing, count: existing.count + 1 });
-        } else {
-          const descriptor = createLensFilter({
-            mapUrl: spec.mapUrl,
-            width: spec.width,
-            height: spec.height,
-            scale: spec.scale,
-            blur: spec.blur,
-            saturation: spec.saturation,
-            brightness: spec.brightness,
-            animateBrightness: spec.animateBrightness,
-            dispersion: spec.dispersion,
-          });
-          next.set(spec.key, {
-            id,
-            mapUrl: spec.mapUrl,
-            width: spec.width,
-            height: spec.height,
-            passes: descriptor.passes,
-            ratios: lensPassScaleRatios(descriptor.passes, spec.scale),
-            region: lensRegionPercent(spec.width, spec.height, descriptor.regionPaddingPx),
-            count: 1,
-          });
-        }
-        return next;
-      });
-      return id;
-    },
-    [idFor],
-  );
+  const acquire = store.acquire;
 
   const release = useCallback((id: string) => {
-    const key = idToKey.current.get(id);
-    if (!key) return;
-    setEntries((prev) => {
-      const existing = prev.get(key);
-      if (!existing) return prev;
-      const next = new Map(prev);
-      if (existing.count <= 1) {
-        next.delete(key);
-        idToKey.current.delete(id);
-      } else {
-        next.set(key, { ...existing, count: existing.count - 1 });
-      }
-      return next;
-    });
-  }, []);
+    if (store.release(id)) nodesRef.current.delete(id);
+  }, [store]);
 
   const setScale = useCallback((id: string, base: number) => {
     const nodes = nodesRef.current.get(id);
     if (!nodes) return;
     for (const { node, ratio } of nodes.scale.values()) {
-      node.setAttribute('scale', String(Math.max(0, base * ratio)));
+      const value = String(Math.max(0, base * ratio));
+      if (node.getAttribute('scale') !== value) node.setAttribute('scale', value);
     }
   }, []);
 
@@ -197,9 +128,9 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
     const nodes = nodesRef.current.get(id);
     if (!nodes) return;
     const slope = String(Math.max(0, amount));
-    nodes.brightnessR?.setAttribute('slope', slope);
-    nodes.brightnessG?.setAttribute('slope', slope);
-    nodes.brightnessB?.setAttribute('slope', slope);
+    for (const node of [nodes.brightnessR, nodes.brightnessG, nodes.brightnessB]) {
+      if (node && node.getAttribute('slope') !== slope) node.setAttribute('slope', slope);
+    }
   }, []);
 
   const api = useMemo<RegistryApi>(
@@ -207,113 +138,123 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
     [acquire, release, setScale, setBrightness],
   );
 
-  const scaleRef =
-    (id: string, slot: number, ratio: number) =>
-    (node: SVGFEDisplacementMapElement | null) => {
-      if (node) {
-        filterNodes(id).scale.set(slot, { node, ratio });
-      } else {
-        nodesRef.current.get(id)?.scale.delete(slot);
+  const renderEntry = useCallback((entry: FilterEntry) => {
+    const scaleRef =
+      (id: string, slot: number, ratio: number) =>
+      (node: SVGFEDisplacementMapElement | null) => {
+        if (node) {
+          filterNodes(id).scale.set(slot, { node, ratio });
+        } else {
+          nodesRef.current.get(id)?.scale.delete(slot);
+        }
+      };
+
+    const brightnessRef =
+      (id: string, channel: 'r' | 'g' | 'b') =>
+      (node: SVGComponentTransferFunctionElement | null) => {
+        const nodes = node ? filterNodes(id) : nodesRef.current.get(id);
+        if (!nodes) return;
+        if (channel === 'r') nodes.brightnessR = node;
+        else if (channel === 'g') nodes.brightnessG = node;
+        else nodes.brightnessB = node;
+      };
+
+    const renderPass = (
+      id: string,
+      ratios: number[],
+      pass: LensFilterPass,
+      index: number,
+      nextSlot: () => number,
+    ) => {
+      switch (pass.type) {
+        case 'displacement': {
+          const slot = nextSlot();
+          return (
+            <feDisplacementMap
+              key={index}
+              ref={scaleRef(id, slot, ratios[slot] ?? 1)}
+              in={pass.input}
+              in2={pass.map}
+              scale={pass.scale}
+              xChannelSelector="R"
+              yChannelSelector="G"
+              result={pass.result}
+            />
+          );
+        }
+        case 'channel':
+          return (
+            <feColorMatrix
+              key={index}
+              in={pass.input}
+              type="matrix"
+              values={lensChannelMatrix(pass.channel)}
+              result={pass.result}
+            />
+          );
+        case 'blend':
+          return (
+            <feBlend
+              key={index}
+              in={pass.input}
+              in2={pass.input2}
+              mode={pass.mode}
+              result={pass.result}
+            />
+          );
+        case 'blur':
+          return (
+            <feGaussianBlur
+              key={index}
+              in={pass.input}
+              stdDeviation={pass.sigma}
+              result={pass.result}
+            />
+          );
+        case 'saturate':
+          return (
+            <feColorMatrix
+              key={index}
+              in={pass.input}
+              type="matrix"
+              values={lensSaturationMatrix(pass.amount)}
+              result={pass.result}
+            />
+          );
+        case 'brightness':
+          return (
+            <feComponentTransfer key={index} in={pass.input} result={pass.result}>
+              <feFuncR
+                type="linear"
+                slope={pass.amount}
+                intercept={0}
+                ref={brightnessRef(id, 'r')}
+              />
+              <feFuncG
+                type="linear"
+                slope={pass.amount}
+                intercept={0}
+                ref={brightnessRef(id, 'g')}
+              />
+              <feFuncB
+                type="linear"
+                slope={pass.amount}
+                intercept={0}
+                ref={brightnessRef(id, 'b')}
+              />
+            </feComponentTransfer>
+          );
       }
     };
 
-  const brightnessRef =
-    (id: string, channel: 'r' | 'g' | 'b') =>
-    (node: SVGComponentTransferFunctionElement | null) => {
-      const nodes = node ? filterNodes(id) : nodesRef.current.get(id);
-      if (!nodes) return;
-      if (channel === 'r') nodes.brightnessR = node;
-      else if (channel === 'g') nodes.brightnessG = node;
-      else nodes.brightnessB = node;
-    };
-
-  const renderPass = (
-    id: string,
-    ratios: number[],
-    pass: LensFilterPass,
-    index: number,
-    nextSlot: () => number,
-  ) => {
-    switch (pass.type) {
-      case 'displacement': {
-        const slot = nextSlot();
-        return (
-          <feDisplacementMap
-            key={index}
-            ref={scaleRef(id, slot, ratios[slot] ?? 1)}
-            in={pass.input}
-            in2={pass.map}
-            scale={pass.scale}
-            xChannelSelector="R"
-            yChannelSelector="G"
-            result={pass.result}
-          />
-        );
-      }
-      case 'channel':
-        return (
-          <feColorMatrix
-            key={index}
-            in={pass.input}
-            type="matrix"
-            values={lensChannelMatrix(pass.channel)}
-            result={pass.result}
-          />
-        );
-      case 'blend':
-        return (
-          <feBlend
-            key={index}
-            in={pass.input}
-            in2={pass.input2}
-            mode={pass.mode}
-            result={pass.result}
-          />
-        );
-      case 'blur':
-        return (
-          <feGaussianBlur
-            key={index}
-            in={pass.input}
-            stdDeviation={pass.sigma}
-            result={pass.result}
-          />
-        );
-      case 'saturate':
-        return (
-          <feColorMatrix
-            key={index}
-            in={pass.input}
-            type="matrix"
-            values={lensSaturationMatrix(pass.amount)}
-            result={pass.result}
-          />
-        );
-      case 'brightness':
-        return (
-          <feComponentTransfer key={index} in={pass.input} result={pass.result}>
-            <feFuncR
-              type="linear"
-              slope={pass.amount}
-              intercept={0}
-              ref={brightnessRef(id, 'r')}
-            />
-            <feFuncG
-              type="linear"
-              slope={pass.amount}
-              intercept={0}
-              ref={brightnessRef(id, 'g')}
-            />
-            <feFuncB
-              type="linear"
-              slope={pass.amount}
-              intercept={0}
-              ref={brightnessRef(id, 'b')}
-            />
-          </feComponentTransfer>
-        );
-    }
-  };
+    const { id, mapUrl, width, height, passes, ratios, region } = entry;
+    let slot = 0;
+    return <filter id={id} x={region.x} y={region.y} width={region.width} height={region.height}
+      colorInterpolationFilters={LENS_FILTER_COLOR_INTERPOLATION}>
+      <feImage href={mapUrl} x="0" y="0" width={width} height={height} preserveAspectRatio="none" result="map"/>
+      {passes.map((pass, index) => renderPass(id, ratios, pass, index, () => slot++))}
+    </filter>;
+  }, [filterNodes]);
 
   return (
     <GlassFilterRegistryContext.Provider value={api}>
@@ -326,47 +267,24 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
         colorInterpolationFilters={LENS_FILTER_COLOR_INTERPOLATION}
       >
         <defs>
-          {[...entries.values()].map(({ id, mapUrl, width, height, passes, ratios, region }) => {
-            let slot = 0;
-            const nextSlot = (): number => slot++;
-            return (
-              <filter
-                key={id}
-                id={id}
-                x={region.x}
-                y={region.y}
-                width={region.width}
-                height={region.height}
-                colorInterpolationFilters={LENS_FILTER_COLOR_INTERPOLATION}
-              >
-                {/*
-                  * The displacement map. preserveAspectRatio=none stretches the
-                  * bitmap over the element box; neutral interior pixels keep the
-                  * flat middle undistorted.
-                  */}
-                <feImage
-                  href={mapUrl}
-                  x="0"
-                  y="0"
-                  width={width}
-                  height={height}
-                  preserveAspectRatio="none"
-                  result="map"
-                />
-                {passes.map((pass, index) => renderPass(id, ratios, pass, index, nextSlot))}
-              </filter>
-            );
-          })}
+          {entries.map(entry => <FilterGraph key={entry.id} entry={entry} render={renderEntry}/>)}
         </defs>
       </svg>
     </GlassFilterRegistryContext.Provider>
   );
 }
 
+// Count changes and other surfaces' resizes must not reconcile an unchanged
+// graph (or detach/reattach its animation refs).
+const FilterGraph = memo(function FilterGraph({ entry, render }: {
+  entry: FilterEntry;
+  render: (entry: FilterEntry) => ReactNode;
+}) { return render(entry); });
+
 export interface UseGlassFilterOptions {
   /** Whether a filter is needed at all (quality tier + known size). */
   enabled: boolean;
-  /** true = share filter across identical geometry (Medium); false = private (High). */
+  /** true = share immutable geometry; false = private for elasticity/hover retuning. */
   shared: boolean;
   /** Lens geometry + material params (optics-resolved). Ignored with `preset`. */
   map: Omit<LensMapOptions, 'skipDataUrl'>;
@@ -398,8 +316,6 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   const instanceKey = useId();
   const [filterId, setFilterId] = useState<string | null>(null);
   const baseScaleRef = useRef(0);
-  const filterIdRef = useRef<string | null>(null);
-  filterIdRef.current = filterId;
 
   const { enabled, shared, map, preset, blur, saturation, brightness, animateBrightness, dispersion } =
     opts;
@@ -430,7 +346,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
         baseScale = presetScale ?? 0;
         shapeKey = presetKey;
       } else {
-        const generated = generateLensMap({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
+        const generated = generateLensMapImage({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
         if (!generated.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
         mapUrl = generated.dataUrl;
         baseScale = generated.maxScale;
@@ -492,18 +408,20 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     instanceKey,
   ]);
 
+  // A replaced spring's cleanup must address its old graph, never the new
+  // filterId from a mutable "latest id" ref.
   const setFilterScale = useCallback(
     (base: number) => {
-      if (registry && filterIdRef.current) registry.setScale(filterIdRef.current, base);
+      if (registry && filterId) registry.setScale(filterId, base);
     },
-    [registry],
+    [registry, filterId],
   );
 
   const setFilterBrightness = useCallback(
     (amount: number) => {
-      if (registry && filterIdRef.current) registry.setBrightness(filterIdRef.current, amount);
+      if (registry && filterId) registry.setBrightness(filterId, amount);
     },
-    [registry],
+    [registry, filterId],
   );
 
   return { filterId, baseScaleRef, setFilterScale, setFilterBrightness };
