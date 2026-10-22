@@ -1,13 +1,11 @@
-import { cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
-import { resolve, relative } from 'node:path';
-import { PNG } from 'pngjs';
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { evidenceFiles, screenshotPair, sha256 } from './lib/evidence.mjs';
 
 const raw = resolve('benchmarks/results'), out = resolve('benchmarks/evidence-review');
-const sha = data => createHash('sha256').update(data).digest('hex');
 const jsName = 'index-DmA9kUn9.js';
 const expected = 'b93c3d1dcee8e136532c379c95caee3e7bc4ae1171a634f43bf2072e6e6af21f';
-if (sha(await readFile(resolve('.benchmark-dist/assets', jsName))) !== expected) {
+if (sha256(await readFile(resolve('.benchmark-dist/assets', jsName))) !== expected) {
   throw new Error('Review build changed; do not overwrite the archived experiment');
 }
 const before = JSON.parse(await readFile(resolve(raw, 'review-final-baseline/results.json')));
@@ -39,26 +37,9 @@ for (const [name, aPath, bPath, crop] of [
   ['medium', 'review-visual/medium-baseline.png', 'review-visual/medium-optimized.png', { x: 40, y: 150, width: 1100, height: 700 }],
   ['image-working-set', 'review-images/previous.png', 'review-images/optimized.png', null],
 ]) {
-  const a = PNG.sync.read(await readFile(resolve(raw, aPath))), b = PNG.sync.read(await readFile(resolve(raw, bPath)));
-  const box = crop ?? { x: 0, y: 0, width: a.width, height: a.height };
-  if (a.width !== b.width || a.height !== b.height || box.x + box.width > a.width || box.y + box.height > a.height) {
-    throw new Error(`Invalid screenshot crop: ${name}`);
-  }
-  const pair = new PNG({ width: box.width * 2, height: box.height });
-  PNG.bitblt(a, pair, box.x, box.y, box.width, box.height, 0, 0);
-  PNG.bitblt(b, pair, box.x, box.y, box.width, box.height, box.width, 0);
-  await writeFile(resolve(out, `${name}-pair.png`), PNG.sync.write(pair));
+  await screenshotPair(resolve(raw, aPath), resolve(raw, bPath), resolve(out, `${name}-pair.png`), crop);
 }
-const files = [];
-async function inventory(dir) {
-  for (const name of await readdir(dir)) {
-    const path = resolve(dir, name), info = await stat(path);
-    if (info.isDirectory()) await inventory(path);
-    else if (name !== 'manifest.json') files.push({ path: relative(out, path).replaceAll('\\', '/'),
-      bytes: info.size, sha256: sha(await readFile(path)) });
-  }
-}
-await inventory(out);
+const files = await evidenceFiles(out);
 await writeFile(resolve(out, 'manifest.json'), JSON.stringify({
   previous: { path: '../evidence-round2/build', jsSha256: 'fab08d806092ae32a4eed70905023ba8a799576e3cf93e9ee77bfda698c41460' },
   optimized: { path: 'build', jsSha256: expected }, sourceBaseRevision: before.revision,

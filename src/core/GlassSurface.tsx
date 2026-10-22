@@ -10,6 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { useGlassQuality, type GlassQuality } from './useGlassQuality';
 import { useOverLight, type OverLight } from './useOverLight';
 import { useGlassFilter, type GlassFilterPreset } from './SvgFilterRegistry';
@@ -158,30 +159,31 @@ export function GlassSurface(props: GlassSurfaceProps) {
   const motionRef = useRef<HTMLDivElement | null>(null);
   const highlightRef = useRef<HTMLDivElement | null>(null);
 
-  // Element size, rebuilt via ResizeObserver with a ~100ms trailing throttle.
+  // ResizeObserver already coalesces layout changes before paint. Commit that
+  // frame's map immediately: a debounce starves continuous width animations,
+  // and another rAF would defer the geometry until the following frame.
   // NOTE: offsetWidth/Height (border box) — contentRect would exclude padding,
   // but backdrop-filter space is the border box, so the map must cover it all.
   const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    let timer: number | undefined;
+    let previousWidth = -1;
+    let previousHeight = -1;
     const unobserve = observeResize(el, () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        setSize((prev) => {
-          const width = el.offsetWidth;
-          const height = el.offsetHeight;
-          return prev.width === width && prev.height === height
-            ? prev
-            : { width, height };
-        });
-      }, 100);
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      if (width === previousWidth && height === previousHeight) return;
+      previousWidth = width;
+      previousHeight = height;
+      // Ordinary concurrent state updates may miss the upcoming paint. Only
+      // filter nodes change here, so this does not resize the observed box.
+      flushSync(() => {
+        setSize((prev) => prev.width === width && prev.height === height
+          ? prev : { width, height });
+      });
     });
-    return () => {
-      window.clearTimeout(timer);
-      unobserve();
-    };
+    return unobserve;
   }, []);
 
   const dpr = useGlassDpr();

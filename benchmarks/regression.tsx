@@ -7,7 +7,7 @@ import { backdropImageCacheStats, probeBackdropLight } from '../src/core/backdro
 import '../src/tokens.css';
 import '../src/core/glass.css';
 
-type Options = { count?: number; quality?: GlassQuality; elasticity?: number; boost?: number; width?: number; radius?: number; optics?: Partial<GlassOptics>; nested?: boolean; text?: boolean; textSize?: number; auto?: boolean; group?: boolean; lightGroup?: boolean };
+export type Options = { count?: number; quality?: GlassQuality; elasticity?: number; boost?: number; width?: number; radius?: number; optics?: Partial<GlassOptics>; nested?: boolean; text?: boolean; textSize?: number; auto?: boolean; group?: boolean; lightGroup?: boolean };
 const root = createRoot(document.getElementById('root')!);
 let clicks = 0;
 function Fixture(options: Options) {
@@ -31,3 +31,5 @@ const api = {
 };
 api.render();
 (window as unknown as {glassTest:typeof api}).glassTest = api;
+
+export type GlassTestApi = typeof api;

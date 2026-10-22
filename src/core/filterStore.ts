@@ -49,6 +49,26 @@ export function createFilterStore(namespace: string) {
       entries.set(spec.key, { entry, count: 1 }); keys.set(id, spec.key); publish();
       return id;
     },
+    /** Retain a private graph's identity and animation passes during resize. */
+    resize(id: string, spec: GlassFilterSpec): boolean {
+      const key = keys.get(id);
+      if (key === undefined) return false;
+      const existing = entries.get(key)!;
+      if (existing.count !== 1 || (spec.key !== key && entries.has(spec.key))) return false;
+      const descriptor = createLensFilter(spec);
+      const entry: FilterEntry = {
+        ...existing.entry,
+        mapUrl: spec.mapUrl,
+        width: spec.width,
+        height: spec.height,
+        region: lensRegionPercent(spec.width, spec.height, descriptor.regionPaddingPx),
+      };
+      entries.delete(key);
+      entries.set(spec.key, { entry, count: 1 });
+      keys.set(id, spec.key);
+      publish();
+      return true;
+    },
     /** True only when the graph's final owner has released it. */
     release(id: string): boolean {
       const key = keys.get(id);

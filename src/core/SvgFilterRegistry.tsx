@@ -19,6 +19,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useId,
   useMemo,
   useRef,
@@ -77,6 +78,7 @@ export interface GlassFilterPreset {
 
 interface RegistryApi {
   acquire(spec: GlassFilterSpec): string;
+  resize(id: string, spec: GlassFilterSpec): boolean;
   release(id: string): void;
   setScale(id: string, base: number): void;
   setBrightness(id: string, amount: number): void;
@@ -110,6 +112,7 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   }, []);
 
   const acquire = store.acquire;
+  const resize = store.resize;
 
   const release = useCallback((id: string) => {
     if (store.release(id)) nodesRef.current.delete(id);
@@ -134,8 +137,8 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   }, []);
 
   const api = useMemo<RegistryApi>(
-    () => ({ acquire, release, setScale, setBrightness }),
-    [acquire, release, setScale, setBrightness],
+    () => ({ acquire, resize, release, setScale, setBrightness }),
+    [acquire, resize, release, setScale, setBrightness],
   );
 
   const renderEntry = useCallback((entry: FilterEntry) => {
@@ -311,11 +314,20 @@ export interface UseGlassFilterResult {
   setFilterBrightness: (amount: number) => void;
 }
 
+// Commit the resized map before paint, while keeping SSR free of layout effects.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResult {
   const registry = useContext(GlassFilterRegistryContext);
   const instanceKey = useId();
   const [filterId, setFilterId] = useState<string | null>(null);
   const baseScaleRef = useRef(0);
+  const ownedRef = useRef<{
+    registry: RegistryApi;
+    id: string;
+    key: string;
+    resizeKey: string | null;
+  } | null>(null);
 
   const { enabled, shared, map, preset, blur, saturation, brightness, animateBrightness, dispersion } =
     opts;
@@ -326,16 +338,29 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   const presetWidth = preset?.width;
   const presetHeight = preset?.height;
 
-  useEffect(() => {
+  // Geometry updates have no per-update cleanup: only replaced graphs and the
+  // final unmount release ownership. This also handles StrictMode's remount.
+  useIsomorphicLayoutEffect(() => () => {
+    const owned = ownedRef.current;
+    if (owned) owned.registry.release(owned.id);
+    ownedRef.current = null;
+  }, [registry]);
+
+  useIsomorphicLayoutEffect(() => {
+    const releaseOwned = () => {
+      const owned = ownedRef.current;
+      if (owned) owned.registry.release(owned.id);
+      ownedRef.current = null;
+    };
     // A preset carries its own box: glyph tiles know their raster box up front
     // and must not wait for the ResizeObserver.
     const filterWidth = presetWidth ?? width;
     const filterHeight = presetHeight ?? height;
     if (!registry || !enabled || filterWidth < 2 || filterHeight < 2) {
+      releaseOwned();
       setFilterId(null);
       return;
     }
-    let id: string | null = null;
     try {
       let mapUrl: string;
       let baseScale: number;
@@ -363,7 +388,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
         `sc${Math.round(baseScale * 100)}`,
         shared ? 'shared' : instanceKey,
       ].join('|');
-      id = registry.acquire({
+      const spec: GlassFilterSpec = {
         key,
         width: filterWidth,
         height: filterHeight,
@@ -374,15 +399,29 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
         brightness,
         animateBrightness: animateBrightness ?? false,
         dispersion,
-      });
+      };
+      // Only rounded rectangles with unchanged material may keep their private
+      // graph. Shared filters stay immutable; glyph presets keep their own key.
+      const resizeKey = !shared && presetKey === undefined
+        ? JSON.stringify([radius, edge, curvature, strength, dpr, rasterScale,
+            blur, saturation, brightness, animateBrightness, dispersion])
+        : null;
+      const owned = ownedRef.current;
+      if (owned?.registry === registry && owned.key === key) return;
+      if (owned?.registry === registry && resizeKey !== null &&
+          owned.resizeKey === resizeKey && registry.resize(owned.id, spec)) {
+        owned.key = key;
+        return;
+      }
+      releaseOwned();
+      const id = registry.acquire(spec);
+      ownedRef.current = { registry, id, key, resizeKey };
       setFilterId(id);
     } catch {
+      releaseOwned();
       setFilterId(null);
       return;
     }
-    return () => {
-      if (id) registry.release(id);
-    };
   }, [
     registry,
     enabled,

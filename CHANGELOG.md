@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.4 — 2026-10-22
+
+### Fixed
+
+- Synchronize rounded glass filter geometry before paint during continuous
+  width/height changes, removing the 100 ms trailing resize debounce.
+- Keep private filter identities and animation passes during geometry-only
+  resizing so elasticity and hover brightness continue without restarting.
+  Shared filters retain isolated, reference-counted ownership.
+
+### Tests
+
+- Share browser setup, error/cleanup checks, scheduler test environments and
+  historical evidence utilities. Replace repeated settled-size checks with
+  continuous resize coverage for shared Medium/High and private High filters.
+- Add `test:release` as one validation entry point. Keep performance experiments
+  optional and preserve archived pixel fixtures, screenshots and builds.
+
 ## 0.3.3 — 2026-10-22
 
 ### Added

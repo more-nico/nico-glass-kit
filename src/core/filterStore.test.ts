@@ -38,4 +38,36 @@ describe('filter ownership and batched publication', () => {
     expect(store.acquire({ ...spec, key: 'Aa' })).not.toBe(store.acquire({ ...spec, key: 'B@' }));
     await Promise.resolve(); expect(store.getSnapshot()).toHaveLength(2);
   });
+  it('resizes a private graph without replacing its id or animation passes', async () => {
+    const store = createFilterStore('resize');
+    const id = store.acquire(spec);
+    await Promise.resolve();
+    const before = store.getSnapshot()[0];
+    const resized = { ...spec, key: 'wider', width: 400, mapUrl: 'data:image/png;base64,wider' };
+    expect(store.resize(id, resized)).toBe(true);
+    await Promise.resolve();
+    const after = store.getSnapshot()[0];
+    expect(after).toMatchObject({ id, width: 400, height: 120, mapUrl: resized.mapUrl });
+    expect(after.passes).toBe(before.passes);
+    expect(after.ratios).toBe(before.ratios);
+    expect(after.region).not.toEqual(before.region);
+    expect(store.acquire(resized)).toBe(id);
+    expect(store.release(id)).toBe(false);
+    expect(store.release(id)).toBe(true);
+    await Promise.resolve();
+    expect(store.getSnapshot()).toEqual([]);
+  });
+  it('never resizes a multiply owned graph or overwrites another geometry', async () => {
+    const store = createFilterStore('immutable');
+    const id = store.acquire(spec);
+    store.acquire(spec);
+    expect(store.resize(id, { ...spec, key: 'wider', width: 400 })).toBe(false);
+    store.release(id);
+    const otherId = store.acquire({ ...spec, key: 'other' });
+    expect(store.resize(id, { ...spec, key: 'other', width: 400 })).toBe(false);
+    await Promise.resolve();
+    expect(store.getSnapshot().map(entry => [entry.id, entry.width])).toEqual([[id, 200], [otherId, 200]]);
+    store.release(id);
+    expect(store.resize(id, spec)).toBe(false);
+  });
 });

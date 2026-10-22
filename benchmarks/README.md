@@ -1,5 +1,20 @@
 # 可复跑的玻璃渲染 Benchmark
 
+## 日常与发布验证
+
+`npm test` 运行快速单元测试；`npm run test:browser` 运行浏览器回归。
+发布前统一运行一次 `npm run test:release`，包含类型检查、单元测试、浏览器回归、库构建和 playground 构建。
+随后用 `npm pack --ignore-scripts` 打包，并发布同一份已验证的 tarball，避免生命周期钩子重复执行检查和构建。
+
+浏览器用例共用初始化、页面异常检查和卸载清理检查。尺寸回归在 ResizeObserver 提交后、绘制前采样，覆盖
+Medium/High 共享滤镜及 High 私有滤镜的连续宽高动画、共享所有权和弹性/悬停状态。
+`resize.spec.ts` 负责动态尺寸；`transparency.spec.ts` 负责透明/半透明像素，不再重复检查动画停止后的尺寸。
+
+以下性能实验按需运行，不属于每次发布的必跑项。`evidence*` 是已有报告对应的历史构建、截图和原始数据，
+不是额外测试套件；历史打包脚本共用 `lib/evidence.mjs`，保留各轮构建校验及元数据，不能用当前构建覆盖旧证据。
+
+## 性能实验
+
 生产构建独立于 playground，避免开发模式、HMR、StrictMode 重复挂载与控制面板自身的更新干扰性能数据。视觉 fixture 使用确定性网格、彩色背景、嵌套玻璃和字形玻璃，没有外部图片或网络字体。
 
 ## 运行

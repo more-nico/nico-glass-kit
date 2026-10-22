@@ -1,21 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
-declare global { interface Window { glassTest: { render(options?:Record<string,unknown>):void; unmount():void; probeBackground():unknown; stats(): {cache:{generated:number};images:{size:number;bytes:number;evictions:number;pending:number;activeDecodes:number};filters:number;clicks:number} }; __activeResizeObservers:number; __imageCreates:number; __maxImageDecodes:number; } }
-async function ready(page:Page, options?:Record<string,unknown>) {
-  if(options) await page.evaluate(o=>window.glassTest.render(o),options);
-  await expect(page.locator('[data-test="surface-0"] .ngs-effect')).toHaveCSS('backdrop-filter',/url\(/);
-}
-test.beforeEach(async ({page})=>{
-  await page.addInitScript(()=>{
-    const Native=window.ResizeObserver;
-    window.__activeResizeObservers=0;
-    window.ResizeObserver=class extends Native {
-      active=false;
-      observe(target:Element,options?:ResizeObserverOptions) {if(!this.active){this.active=true;window.__activeResizeObservers++;}super.observe(target,options);}
-      disconnect(){if(this.active){this.active=false;window.__activeResizeObservers--;}super.disconnect();}
-    };
-  });
-  await page.goto('/regression.html'); await page.waitForFunction(()=>!!window.glassTest);
-});
+import { test, expect, ready } from './fixtures';
 test('StrictMode, filter sharing, namespace isolation and final-owner cleanup',async({page})=>{
   await ready(page,{quality:'medium',count:30,nested:true});
   await expect(page.locator('filter')).toHaveCount(2);
@@ -23,8 +6,6 @@ test('StrictMode, filter sharing, namespace isolation and final-owner cleanup',a
   await ready(page,{quality:'high',count:30,elasticity:0}); await expect(page.locator('filter')).toHaveCount(1);
   await ready(page,{quality:'high',count:30,elasticity:0.2}); await expect(page.locator('filter')).toHaveCount(30);
   expect(await page.evaluate(()=>window.__activeResizeObservers)).toBe(1);
-  await page.evaluate(()=>window.glassTest.unmount()); await expect(page.locator('filter')).toHaveCount(0);
-  expect(await page.evaluate(()=>window.__activeResizeObservers)).toBe(0);
 });
 test('hover brightness stays private, elasticity/glint track the pointer without rasterizing',async({page})=>{
   await ready(page,{quality:'high',boost:0.5});
@@ -41,16 +22,24 @@ test('hover brightness stays private, elasticity/glint track the pointer without
 });
 test('live resize, optics changes and DPR changes replace maps without leaking filter nodes',async({page})=>{
   await ready(page);
-  for(let i=0;i<12;i++) {await ready(page,{width:240+i,radius:20+i}); await page.waitForTimeout(150);}
-  await expect(page.locator('filter')).toHaveCount(3);
+  for (const [width, radius] of [[241, 21], [320, 26], [180, 100]]) {
+    await ready(page, { width, radius });
+    await expect(page.locator('filter feImage').first()).toHaveAttribute('width', String(width));
+    await expect(page.locator('filter')).toHaveCount(3);
+  }
   await ready(page,{optics:{refraction:0.4,depth:14,dispersion:0.4}});
   await expect.poll(async()=>Number(await page.locator('filter feDisplacementMap').nth(1).getAttribute('scale'))).toBeCloseTo(0.4*24*(255/127),5);
+  await expect(page.locator('filter feImage').first()).toHaveAttribute('width', '240');
   const before=await page.locator('filter feImage').first().getAttribute('href');
   const cdp=await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:2,mobile:false});
+  // DPR-only CDP overrides do not emit resize/resolution events in headless
+  // Edge. Change the viewport by 1px to deliver a native resize; the fixed CSS
+  // surface dimensions stay unchanged, so only DPR can alter the bitmap.
+  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1441,height:900,deviceScaleFactor:2,mobile:false});
+  expect(await page.evaluate(() => devicePixelRatio)).toBe(2);
   await expect.poll(()=>page.locator('filter feImage').first().getAttribute('href')).not.toBe(before);
+  await expect(page.locator('filter feImage').first()).toHaveAttribute('width', '240');
   await expect(page.locator('filter')).toHaveCount(3);
-  await page.evaluate(()=>window.glassTest.unmount()); await expect(page.locator('filter')).toHaveCount(0);
 });
 test('auto light updates, glyph masks and tier transitions remain functional',async({page})=>{
   await ready(page,{auto:true,text:true});
@@ -106,7 +95,6 @@ test('slow native hit-tests yield between points and still update all surfaces',
   expect(await page.evaluate(()=>(window as unknown as {firstProbeHits:()=>number}).firstProbeHits())).toBe(1);
   await page.evaluate(()=>{(window as unknown as {finishSlowProbe:()=>void}).finishSlowProbe();document.getElementById('background')!.style.backgroundColor='#ffffff';});
   for(let i=0;i<3;i++) await expect(page.locator(`[data-test="surface-${i}"]`)).toHaveAttribute('data-ngs-light','true');
-  await page.evaluate(()=>window.glassTest.unmount());await expect(page.locator('filter')).toHaveCount(0);
 });
 
 test('light-group membership changes discard partly sampled work and preserve one group decision',async({page})=>{
@@ -120,7 +108,6 @@ test('light-group membership changes discard partly sampled work and preserve on
   });
   await expect(page.locator('[data-test]')).toHaveCount(4);
   for(let i=0;i<4;i++) await expect(page.locator(`[data-test="surface-${i}"]`)).toHaveAttribute('data-ngs-light','true');
-  await page.evaluate(()=>window.glassTest.unmount());await expect(page.locator('filter')).toHaveCount(0);
 });
 
 test('pathological glyph dimensions preserve readable text without allocating a huge distance field',async({page})=>{

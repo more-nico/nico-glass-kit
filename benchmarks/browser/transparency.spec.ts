@@ -1,15 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, ready } from './fixtures';
 
 for (const dispersion of [0, 0.1]) {
   test(`lens graph preserves transparent samples with dispersion ${dispersion}`, async ({ page }) => {
-    await page.goto('/regression.html');
-    await page.evaluate((dispersion) => {
-      const { glassTest } = window as unknown as {
-        glassTest: { render(options: Record<string, unknown>): void };
-      };
-      glassTest.render({ count: 1, optics: { blur: 0, saturation: 100, brightness: 1, dispersion } });
-    }, dispersion);
-    await expect(page.locator('[data-test="surface-0"] .ngs-effect')).toHaveCSS('backdrop-filter', /url\(/);
+    await ready(page, {
+      count: 1, optics: { blur: 0, saturation: 100, brightness: 1, dispersion },
+    });
 
     const pixels = await page.evaluate(async () => {
       // Exercise the registry's real graph in an isolated SVG so transparent
@@ -57,42 +52,5 @@ for (const dispersion of [0, 0.1]) {
       near(pixels.partial, [73, 37, 110, 223]);
       near(pixels.partialOverBackdrop, [84, 59, 126, 255]);
     }
-  });
-}
-
-for (const elasticity of [0, 0.2]) {
-  test(`rapid width reversals settle on a valid transparent lens with elasticity ${elasticity}`, async ({ page }) => {
-    await page.goto('/regression.html');
-    await page.evaluate((elasticity) => window.glassTest.render({
-      count: 1, width: 306, radius: 26, elasticity,
-      optics: { blur: 3, saturation: 100, brightness: 1.1, depth: 8, curvature: 0.2, dispersion: 0.1 },
-    }), elasticity);
-    const surface = page.locator('[data-test="surface-0"]');
-    await expect(surface.locator('.ngs-effect')).toHaveCSS('backdrop-filter', /url\(/);
-    await surface.evaluate(element => {
-      (element as HTMLElement).style.transition = 'width 300ms ease';
-    });
-    const initial = (await surface.boundingBox())!;
-    for (let i = 0; i < 12; i++) {
-      await surface.evaluate((element, width) => { (element as HTMLElement).style.width = `${width}px`; }, i % 2 ? 306 : 422);
-      await page.mouse.move(initial.x + (i % 2 ? 3 : initial.width - 3), initial.y + 25, { steps: 5 });
-    }
-    // Finish at a new size so this verifies replacement, rather than reusing
-    // the initial map after a trailing resize debounce.
-    await surface.evaluate(element => { (element as HTMLElement).style.width = '380px'; });
-    await expect(page.locator('filter')).toHaveCount(1);
-    await expect(page.locator('filter feImage')).toHaveAttribute('width', '380');
-    await expect(page.locator('filter feColorMatrix[in^="ngs_disp_"]')).toHaveCount(3);
-    const rows = await page.locator('filter feColorMatrix[in^="ngs_disp_"]').evaluateAll(nodes =>
-      nodes.map(node => node.getAttribute('values')!.trim().split(/\s+/).map(Number).slice(15)),
-    );
-    expect(rows).toEqual(Array.from({ length: 3 }, () => [0, 0, 0, 1, 0]));
-    const referenced = await surface.locator('.ngs-effect').evaluate(element => {
-      const id = getComputedStyle(element).backdropFilter.match(/#([^\)"']+)/)?.[1];
-      return !!id && !!document.getElementById(id);
-    });
-    expect(referenced).toBe(true);
-    await page.evaluate(() => window.glassTest.unmount());
-    await expect(page.locator('filter')).toHaveCount(0);
   });
 }
