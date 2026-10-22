@@ -6,6 +6,7 @@ import {
   GlassNavBar,
   GlassPill,
   GlassProvider,
+  GlassRenderGroup,
   GlassSurface,
   type GlassOptics,
   type GlassQuality,
@@ -16,6 +17,7 @@ import { useI18n } from './i18n';
 import { LanguageSwitcher } from './i18n/LanguageSwitcher';
 import { ControlPanel } from './ControlPanel';
 import { FpsMeter } from './FpsMeter';
+import { useFrameValue } from './useFrameValue';
 import { BackgroundScene, type BackgroundId } from './demos/BackgroundScene';
 import { BarsDemo } from './demos/BarsDemo';
 import { ButtonsDemo } from './demos/ButtonsDemo';
@@ -58,6 +60,7 @@ const DEFAULT_PARAMS: DemoParams = {
 export default function App() {
   const { t } = useI18n();
   const [params, setParams] = useState<DemoParams>(DEFAULT_PARAMS);
+  const updateParams = useFrameValue(setParams);
   const [customBg, setCustomBg] = useState<string | null>(null);
   const [pillVisible, setPillVisible] = useState(false);
 
@@ -87,7 +90,7 @@ export default function App() {
 
       <main className="pg-main">
         <HeroDemo params={params} onShowPill={() => setPillVisible(true)} />
-        <div className="pg-gallery">
+        <GlassRenderGroup className="pg-gallery">
           <ButtonsDemo params={params} />
           <CardDemo params={params} />
           <BarsDemo params={params} />
@@ -100,13 +103,13 @@ export default function App() {
           <OverlayDemo params={params} />
           <TextDemo params={params} />
           <DockDemo params={params} />
-        </div>
+        </GlassRenderGroup>
         <GlassSurface as="footer" className="pg-footer" {...glassProps(params)}>
           <p className="pg-footer-text">{t('app.footer')}</p>
         </GlassSurface>
       </main>
 
-      <ControlPanel params={params} onChange={setParams} onUploadBg={setCustomBg} customBg={customBg} />
+      <ControlPanel params={params} onChange={updateParams} onUploadBg={setCustomBg} customBg={customBg} />
 
       <FpsMeter params={params} />
 

@@ -10,6 +10,7 @@ import {
   GlassSegmentedControl,
   GlassSlider,
   GlassSurface,
+  GlassRenderGroup,
   type GlassOptics,
   type GlassQuality,
   type OverLight,
@@ -129,6 +130,7 @@ function tintToHex(tint: string): string {
 }
 
 function Slider(props: {
+  id?: string;
   label: string;
   min: number;
   max: number;
@@ -147,6 +149,8 @@ function Slider(props: {
         </span>
       </span>
       <GlassSlider
+        data-testid={props.id ? `control-${props.id}` : undefined}
+        aria-label={props.label}
         className="cp-slider-track"
         size="sm"
         min={props.min}
@@ -162,10 +166,10 @@ function Slider(props: {
 
 function Group(props: { title: string; children: React.ReactNode }) {
   return (
-    <div className="cp-group">
+    <GlassRenderGroup className="cp-group">
       <span className="cp-label">{props.title}</span>
       {props.children}
-    </div>
+    </GlassRenderGroup>
   );
 }
 
@@ -249,6 +253,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
                       .join(' ')}
                     onClick={() => set('background', id)}
                     aria-label={label}
+                    data-testid={`background-${id}`}
                     title={label}
                     {...glassProps(params)}
                   >
@@ -304,6 +309,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
 
         <Group title={t('panel.group.material')}>
           <Slider
+            id="blur"
             label={t('panel.blur')}
             min={0}
             max={64}
@@ -314,6 +320,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
+            id="saturation"
             label={t('panel.saturation')}
             min={0}
             max={300}
@@ -324,6 +331,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
+            id="brightness"
             label={t('panel.brightness')}
             min={0}
             max={2}
@@ -358,6 +366,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             </div>
           </div>
           <Slider
+            id="tintStrength"
             label={t('panel.tintStrength')}
             min={0}
             max={1}
@@ -371,6 +380,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
 
         <Group title={t('panel.group.performance')}>
           <Slider
+            id="mapScale"
             label={t('panel.mapScale')}
             min={MIN_LENS_MAP_RASTER_SCALE}
             max={MAX_LENS_MAP_RASTER_SCALE}
@@ -390,6 +400,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
 
         <Group title={t('panel.group.refraction')}>
           <Slider
+            id="refraction"
             label={t('panel.refraction')}
             min={0}
             max={1}
@@ -400,6 +411,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
+            id="depth"
             label={t('panel.depth')}
             min={0}
             max={40}
@@ -410,6 +422,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
+            id="curvature"
             label={t('panel.curvature')}
             min={0}
             max={1}
@@ -420,6 +433,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
+            id="dispersion"
             label={t('panel.dispersion')}
             min={0}
             max={1}
@@ -433,6 +447,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
 
         <Group title={t('panel.group.interaction')}>
           <Slider
+            id="highlight"
             label={t('panel.highlight')}
             min={0}
             max={2}
@@ -443,6 +458,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
             params={params}
           />
           <Slider
+            id="elasticity"
             label={t('panel.elasticity')}
             min={0}
             max={0.5}
@@ -455,6 +471,7 @@ export function ControlPanel({ params, onChange, customBg, onUploadBg }: Props) 
 
         <Group title={t('panel.group.shape')}>
           <Slider
+            id="radius"
             label={t('panel.radius')}
             min={8}
             max={80}

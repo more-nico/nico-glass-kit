@@ -29,6 +29,7 @@
 - [Rendering tiers](#rendering-tiers)
 - [Light and dark](#light-and-dark)
 - [Elasticity groups](#elasticity-groups)
+- [Render groups](#render-groups)
 - [Components](#components)
 - [Playground](#playground)
 - [Component gallery](#component-gallery)
@@ -76,6 +77,50 @@ as plain TypeScript + CSS.
 - React 18 or newer.
 - A Chromium-based browser for the refraction pass. Firefox and Safari fall
   back to the low tier (a normal `backdrop-filter` chain) automatically.
+
+## Render groups
+
+`GlassRenderGroup` combines compatible, non-overlapping surfaces into spatial
+filter batches while preserving the requested quality and map raster scale.
+Use it around a row or gallery that shares a backdrop:
+
+```tsx
+import { GlassProvider, GlassRenderGroup, GlassButton } from 'nico-glass-kit';
+
+<GlassProvider quality="high" lensMapRasterScale={0.5}>
+  <GlassRenderGroup style={{ display: 'flex', gap: 16 }}>
+    <GlassButton>Open</GlassButton>
+    <GlassButton>Save</GlassButton>
+  </GlassRenderGroup>
+</GlassProvider>
+```
+
+The wrapper is positioned and inserts internal children; account for that in
+absolute positioning and `:first-child` selectors. Unsupported transforms,
+painted wrappers, clipping, hidden surfaces, surface padding/borders and
+overlapping surfaces use their individual filters. Keyboard activation and
+CSS geometry animations also suspend grouping until they finish.
+
+The component renders a positioned `div`, accepts standard div attributes and
+an `enabled` boolean (default `true`). Place it inside painted or scrolling
+containers so each group has one backdrop boundary. Nested glass, overlapping
+panes, transformed or translucent wrappers and incompatible materials use
+independent filters. Hover and elasticity temporarily restore the affected
+surface's private graph. Encoding failures keep the individual rendering path.
+
+Batching is workload-dependent: large sparse batches can cost more than
+individual panes, so regions and empty space are bounded. Each group retains
+at most 32 MiB of atlas pixels. This is not a total browser/GPU memory limit
+or a promise of 60 fps. Use `enabled={false}` for comparisons and the real
+playground runner documented in [benchmarks/README.md](benchmarks/README.md).
+
+`GlassText` and rounded-surface optical updates share a lazy two-worker queue.
+Rapid edits keep a same-tier preview until the latest exact result arrives;
+the synchronous raster APIs remain available. Rounded surfaces still generate
+their first map and size/DPR changes synchronously before paint. Refraction
+strength and graph-only material changes reuse the existing map. Workers use
+the same main-thread font coverage and stop when their last owner unmounts.
+Worker/CSP failures use the existing main-thread path.
 
 ## Install
 
@@ -372,7 +417,7 @@ for identical-condition performance and visual comparisons.
   Slow motion probes resume across frames, so their samples can span different
   backdrop states and the tint decision can arrive later. Cheap probes drain
   together; detected colour/image changes restart stale work with priority.
-  Scheduling uses a 6 ms normal slice, up to 16 ms for continuations and 32 ms
+  Scheduling uses 6 ms normal/continuation slices and an 8 ms slice
   for paint changes. These are soft budgets; native hit tests are indivisible.
 
 ## License

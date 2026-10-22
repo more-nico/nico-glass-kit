@@ -70,4 +70,18 @@ describe('filter ownership and batched publication', () => {
     store.release(id);
     expect(store.resize(id, spec)).toBe(false);
   });
+  it('retunes private materials in place without reordering unrelated graphs', async () => {
+    const store = createFilterStore('retune');
+    const id = store.acquire(spec);
+    const other = store.acquire({ ...spec, key: 'second' });
+    await Promise.resolve();
+    const updated = { ...spec, key: 'new-material', brightness: 1.7, dispersion: 0.4, scale: 30 };
+    expect(store.update(id, updated)).toBe(true);
+    await Promise.resolve();
+    expect(store.getSnapshot().map(entry => entry.id)).toEqual([id, other]);
+    expect(store.getSnapshot()[0].passes).toEqual(createLensFilter(updated).passes);
+    expect(store.acquire(updated)).toBe(id);
+    expect(store.update(id, { ...updated, key: 'shared-mutation' })).toBe(false);
+    store.release(id); store.release(id); store.release(other);
+  });
 });

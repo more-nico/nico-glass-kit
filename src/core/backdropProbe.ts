@@ -601,6 +601,8 @@ interface ProbeRun {
   styles: Map<Element, CSSStyleDeclaration>;
   rects: Map<Element, DOMRect>;
   colors: Map<Element, Rgba | null>;
+  /** All nine screen sample points for the grid being resolved this run. */
+  gridPoints: Point[];
   pendingImages: boolean;
 }
 
@@ -650,6 +652,7 @@ function createProbeRun(doc: Document, win: Window): ProbeRun {
     styles: new Map(),
     rects: new Map(),
     colors: new Map(),
+    gridPoints: [],
     pendingImages: false,
   };
   // Only scheduler batches reuse this context. Direct public probes must not
@@ -674,8 +677,19 @@ function buildLayer(
   const info = paintInfoFor(node, cs);
   let imageColor: Rgba | null = null;
   if (info.image && info.image.kind === 'url') {
+    // Register every point of this grid's known geometry, not just the point
+    // that happened to hit this node first. One decode then fills exact local
+    // colours for all nine screen samples, so a 32-entry image LRU can evict
+    // the decoded bitmap without forcing another decode on the next point.
+    // This adds no hit-tests and leaves the grid weights unchanged.
+    const gridPoints = run.gridPoints.length
+      ? run.gridPoints.map((samplePoint) => ({
+          x: samplePoint.x - nodeRect.left,
+          y: samplePoint.y - nodeRect.top,
+        }))
+      : null;
     const sample = requestImageSample(node, info, info.image.url,
-      { width: nodeRect.width, height: nodeRect.height }, point);
+      { width: nodeRect.width, height: nodeRect.height }, point, gridPoints);
     imageColor = sample.color;
     run.pendingImages ||= sample.pending;
   }
@@ -749,6 +763,20 @@ function gatherLayers(
   return layers;
 }
 
+/** All nine screen sample points for the 3×3 interior grid, in probe order. */
+function gridScreenPoints(rect: DOMRect, win: Window): Point[] {
+  const points: Point[] = [];
+  for (const fx of GRID_FRACTIONS) {
+    for (const fy of GRID_FRACTIONS) {
+      points.push({
+        x: Math.min(Math.max(rect.left + rect.width * fx, 0), win.innerWidth - 1),
+        y: Math.min(Math.max(rect.top + rect.height * fy, 0), win.innerHeight - 1),
+      });
+    }
+  }
+  return points;
+}
+
 /** Runs the 3×3 interior grid over `rect`, keeping only usable points. */
 function* probeGridSteps(
   doc: Document,
@@ -760,24 +788,24 @@ function* probeGridSteps(
   let pendingImages = false;
   let lastBatch = -1;
   let currentRun: ProbeRun | null = null;
-  for (const fx of GRID_FRACTIONS) {
-    for (const fy of GRID_FRACTIONS) {
-      // A suspended task resumes with this batch's fresh styles and geometry,
-      // never a computed-style/rect cache from a previous frame.
-      if (!currentRun || lastBatch !== batchVersion) {
-        currentRun = createProbeRun(doc, win);
-        lastBatch = batchVersion;
-      }
-      const run = currentRun;
-      const rect = getRect(run);
-      const x = Math.min(Math.max(rect.left + rect.width * fx, 0), win.innerWidth - 1);
-      const y = Math.min(Math.max(rect.top + rect.height * fy, 0), win.innerHeight - 1);
-      const stack = doc.elementsFromPoint(x, y);
-      const layers = resolveLayers(run, stack, x, y);
-      if (layers) luminances.push(relativeLuminance(resolvePointColor(layers, run.fallback)));
-      pendingImages ||= run.pendingImages;
-      yield;
+  const pointCount = GRID_FRACTIONS.length * GRID_FRACTIONS.length;
+  for (let pointIndex = 0; pointIndex < pointCount; pointIndex++) {
+    // A suspended task resumes with this batch's fresh styles and geometry,
+    // never a computed-style/rect cache from a previous frame. Computing the
+    // whole 3×3 screen geometry here lets a first image request pre-register
+    // all exact local samples without adding any hit-test.
+    if (!currentRun || lastBatch !== batchVersion) {
+      currentRun = createProbeRun(doc, win);
+      lastBatch = batchVersion;
+      currentRun.gridPoints = gridScreenPoints(getRect(currentRun), win);
     }
+    const run = currentRun;
+    const point = run.gridPoints[pointIndex];
+    const stack = doc.elementsFromPoint(point.x, point.y);
+    const layers = resolveLayers(run, stack, point.x, point.y);
+    if (layers) luminances.push(relativeLuminance(resolvePointColor(layers, run.fallback)));
+    pendingImages ||= run.pendingImages;
+    yield;
   }
   return { luminances, pendingImages };
 }
@@ -1049,8 +1077,18 @@ function imageSample(state: ImageState, request: SampleRequest): Rgba | null {
     : state.average;
 }
 
-function requestImageSample(node: Element, info: NodePaintInfo, url: string, box: Box, point: Point):
-  { color: Rgba | null; pending: boolean } {
+function imageSampleKey(box: Box, point: Point): string {
+  return `${box.width},${box.height},${point.x},${point.y}`;
+}
+
+function requestImageSample(
+  node: Element,
+  info: NodePaintInfo,
+  url: string,
+  box: Box,
+  point: Point,
+  gridPoints?: readonly Point[] | null,
+): { color: Rgba | null; pending: boolean } {
   let samples = nodeImageSamples.get(node);
   if (!samples || samples.url !== url) {
     samples = { node, url, colors: new Map() };
@@ -1058,28 +1096,47 @@ function requestImageSample(node: Element, info: NodePaintInfo, url: string, box
   }
   const precise = info.size === 'cover' &&
     (info.position === 'center' || info.position.includes('center') || info.position.includes('50%'));
-  const key = precise ? `${box.width},${box.height},${point.x},${point.y}` : 'average';
-  if (samples.colors.has(key)) {
-    const color = samples.colors.get(key)!;
-    retainSample(samples, key, color);
-    return { color, pending: false };
+  // On the first hit for a paint node, its decode would otherwise fill only
+  // this point's colour. A later 32-image LRU eviction would then force a
+  // second decode for the remaining eight points. Request the whole known 3×3
+  // geometry up front: the settle path fills every exact local colour even if
+  // a point is ultimately covered by another layer. The key geometry, 32-entry
+  // LRU and four-decode concurrency remain unchanged.
+  const requested = precise && gridPoints?.length ? gridPoints : [point];
+  const keyFor = precise ? (sample: Point) => imageSampleKey(box, sample) : () => 'average';
+  const currentKey = keyFor(point);
+  const keys = requested.map(keyFor);
+  const cachedCurrent = samples.colors.get(currentKey);
+  if (keys.every((key) => samples.colors.has(key))) {
+    if (cachedCurrent !== undefined) retainSample(samples, currentKey, cachedCurrent);
+    return { color: cachedCurrent ?? null, pending: false };
   }
-  const request: SampleRequest = precise ? { box, point } : { box: null, point: null };
+  const requestFor = (sample: Point): SampleRequest =>
+    precise ? { box, point: sample } : { box: null, point: null };
   const state = imageStates.get(url);
   if (state) {
-    const color = imageSample(state, request);
-    retainSample(samples, key, color);
-    return { color, pending: false };
+    for (let index = 0; index < requested.length; index++) {
+      const key = keys[index];
+      if (samples.colors.has(key)) continue;
+      retainSample(samples, key, imageSample(state, requestFor(requested[index])));
+    }
+    return { color: samples.colors.get(currentKey) ?? null, pending: false };
   }
-  if (typeof window === 'undefined' || typeof Image === 'undefined') return { color: null, pending: false };
+  if (typeof window === 'undefined' || typeof Image === 'undefined') {
+    return { color: cachedCurrent ?? null, pending: false };
+  }
   let load = decodingImages.get(url);
   if (!load) { load = { img: null, requests: new Map() }; decodingImages.set(url, load); }
   let requests = load.requests.get(samples);
   if (!requests) { requests = new Map(); load.requests.set(samples, requests); }
-  requests.delete(key); requests.set(key, request);
-  if (requests.size > IMAGE_SAMPLE_LIMIT) requests.delete(requests.keys().next().value!);
+  for (let index = 0; index < requested.length; index++) {
+    const key = keys[index];
+    if (samples.colors.has(key)) continue;
+    requests.delete(key); requests.set(key, requestFor(requested[index]));
+    if (requests.size > IMAGE_SAMPLE_LIMIT) requests.delete(requests.keys().next().value!);
+  }
   pumpImageDecodes();
-  return { color: null, pending: true };
+  return { color: cachedCurrent ?? null, pending: true };
 }
 
 /** Queued sample owners hold no image buffers; at most four private images decode concurrently. */

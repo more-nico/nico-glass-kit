@@ -29,7 +29,24 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react';
-import { generateLensMapImage, lensMapCacheKey, type LensMapOptions } from './displacementMap';
+import {
+  generateLensMapImage,
+  lensDisplacementScale,
+  lookupLensMapImage,
+  type LensMapImage,
+  type LensMapOptions,
+} from './displacementMap';
+import {
+  lensMapGeometryKey,
+  lensMapOpticsKey,
+  planLensMapUpdate,
+  shouldCommitLensMapResult,
+} from './displacementWorker';
+import {
+  cancelLensMapOwner,
+  lensMapWorkerAvailable,
+  submitLensMapJob,
+} from './rasterWorkerPool';
 import { createFilterStore, type FilterEntry } from './filterStore';
 import {
   LENS_FILTER_COLOR_INTERPOLATION,
@@ -79,6 +96,7 @@ export interface GlassFilterPreset {
 interface RegistryApi {
   acquire(spec: GlassFilterSpec): string;
   resize(id: string, spec: GlassFilterSpec): boolean;
+  update(id: string, spec: GlassFilterSpec): boolean;
   release(id: string): void;
   setScale(id: string, base: number): void;
   setBrightness(id: string, amount: number): void;
@@ -113,6 +131,7 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
 
   const acquire = store.acquire;
   const resize = store.resize;
+  const update = store.update;
 
   const release = useCallback((id: string) => {
     if (store.release(id)) nodesRef.current.delete(id);
@@ -137,8 +156,8 @@ export function SvgFilterRegistry({ children }: { children?: ReactNode }) {
   }, []);
 
   const api = useMemo<RegistryApi>(
-    () => ({ acquire, resize, release, setScale, setBrightness }),
-    [acquire, resize, release, setScale, setBrightness],
+    () => ({ acquire, resize, update, release, setScale, setBrightness }),
+    [acquire, resize, update, release, setScale, setBrightness],
   );
 
   const renderEntry = useCallback((entry: FilterEntry) => {
@@ -307,6 +326,7 @@ export interface UseGlassFilterOptions {
 
 export interface UseGlassFilterResult {
   filterId: string | null;
+  specRef: MutableRefObject<GlassFilterSpec | null>;
   baseScaleRef: MutableRefObject<number>;
   /** Direct DOM mutation of the feDisplacementMap scales, safe per frame. */
   setFilterScale: (base: number) => void;
@@ -316,12 +336,19 @@ export interface UseGlassFilterResult {
 
 // Commit the resized map before paint, while keeping SSR free of layout effects.
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+let nextLensOwner = 0;
 
 export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResult {
   const registry = useContext(GlassFilterRegistryContext);
   const instanceKey = useId();
   const [filterId, setFilterId] = useState<string | null>(null);
+  // Async map commits mutate specRef outside React. GlassSurface's
+  // useGlassRenderMember signature effect only runs on render, so bump this
+  // revision to make the owning surface (and its batched atlas) observe the
+  // changed specRef key. Synchronous first-map/size commits already render.
+  const [, refreshRenderMember] = useState(0);
   const baseScaleRef = useRef(0);
+  const specRef = useRef<GlassFilterSpec | null>(null);
   const ownedRef = useRef<{
     registry: RegistryApi;
     id: string;
@@ -338,89 +365,273 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
   const presetWidth = preset?.width;
   const presetHeight = preset?.height;
 
-  // Geometry updates have no per-update cleanup: only replaced graphs and the
-  // final unmount release ownership. This also handles StrictMode's remount.
-  useIsomorphicLayoutEffect(() => () => {
+  const [owner] = useState(() => `lens:${++nextLensOwner}`);
+  const latestRef = useRef(opts);
+
+  // The displayed map is intentionally separate from the public synchronous
+  // cache: it may be a worker result retained in the split async image cache.
+  const mapRef = useRef<{ dataUrl: string; shapeKey: string } | null>(null);
+  const geometryKeyRef = useRef('');
+  const opticsKeyRef = useRef('');
+  const requestedOpticsKeyRef = useRef('');
+  const revisionRef = useRef(0);
+  const applyGraphRef = useRef<() => void>(() => {});
+
+  const releaseOwned = (): void => {
     const owned = ownedRef.current;
     if (owned) owned.registry.release(owned.id);
     ownedRef.current = null;
-  }, [registry]);
+    specRef.current = null;
+  };
+
+  /**
+   * Rebuild/retune the filter graph from the currently displayed map and the
+   * latest material props. This never generates a map.
+   */
+  const applyGraph = (): void => {
+    const latest = latestRef.current;
+    const displayed = mapRef.current;
+    if (!registry || !displayed) return;
+
+    const currentPreset = latest.preset;
+    const filterWidth = currentPreset?.width ?? latest.map.width;
+    const filterHeight = currentPreset?.height ?? latest.map.height;
+    const baseScale = currentPreset
+      ? currentPreset.scale ?? 0
+      : lensDisplacementScale(latest.map.strength);
+    const shapeKey = displayed.shapeKey;
+    const key = [
+      shapeKey,
+      `b${latest.blur}`,
+      `sat${latest.saturation}`,
+      `br${latest.brightness}`,
+      `ab${latest.animateBrightness ? 1 : 0}`,
+      `x${latest.dispersion}`,
+      `sc${Math.round(baseScale * 100)}`,
+      latest.shared ? 'shared' : instanceKey,
+    ].join('|');
+    const spec: GlassFilterSpec = {
+      key,
+      width: filterWidth,
+      height: filterHeight,
+      mapUrl: displayed.dataUrl,
+      scale: baseScale,
+      blur: latest.blur,
+      saturation: latest.saturation,
+      brightness: latest.brightness,
+      animateBrightness: latest.animateBrightness ?? false,
+      dispersion: latest.dispersion,
+    };
+    baseScaleRef.current = baseScale;
+    specRef.current = spec;
+
+    // Size-only refreshes may keep their private graph and animation passes.
+    // A map/material change falls through to update/acquire.
+    const resizeKey = !latest.shared && currentPreset === undefined
+      ? JSON.stringify([
+          latest.map.radius, latest.map.edge, latest.map.curvature, latest.map.strength,
+          latest.map.dpr, latest.map.rasterScale,
+          latest.blur, latest.saturation, latest.brightness,
+          latest.animateBrightness ?? false, latest.dispersion,
+        ])
+      : null;
+    const owned = ownedRef.current;
+    if (owned?.registry === registry && owned.key === key) return;
+    if (owned?.registry === registry && resizeKey !== null &&
+        owned.resizeKey === resizeKey && registry.resize(owned.id, spec)) {
+      owned.key = key;
+      return;
+    }
+    if (owned?.registry === registry && !latest.shared && registry.update(owned.id, spec)) {
+      owned.key = key;
+      owned.resizeKey = resizeKey;
+      return;
+    }
+    releaseOwned();
+    const id = registry.acquire(spec);
+    specRef.current = spec;
+    ownedRef.current = { registry, id, key, resizeKey };
+    setFilterId(id);
+  };
+  useIsomorphicLayoutEffect(() => {
+    latestRef.current = opts;
+    applyGraphRef.current = applyGraph;
+  });
+
+  // Geometry updates have no per-update cleanup: only replaced graphs and the
+  // final unmount release ownership. This also handles StrictMode's remount.
+  useIsomorphicLayoutEffect(() => () => {
+    revisionRef.current++;
+    requestedOpticsKeyRef.current = '';
+    mapRef.current = null;
+    geometryKeyRef.current = '';
+    opticsKeyRef.current = '';
+    cancelLensMapOwner(owner);
+    releaseOwned();
+  }, [registry, owner]);
 
   useIsomorphicLayoutEffect(() => {
-    const releaseOwned = () => {
-      const owned = ownedRef.current;
-      if (owned) owned.registry.release(owned.id);
-      ownedRef.current = null;
-    };
-    // A preset carries its own box: glyph tiles know their raster box up front
-    // and must not wait for the ResizeObserver.
-    const filterWidth = presetWidth ?? width;
-    const filterHeight = presetHeight ?? height;
-    if (!registry || !enabled || filterWidth < 2 || filterHeight < 2) {
+    const latest = latestRef.current;
+    const currentPreset = latest.preset;
+    const filterWidth = currentPreset?.width ?? latest.map.width;
+    const filterHeight = currentPreset?.height ?? latest.map.height;
+
+    if (!registry || !latest.enabled || filterWidth < 2 || filterHeight < 2) {
+      revisionRef.current++;
+      cancelLensMapOwner(owner);
+      requestedOpticsKeyRef.current = '';
+      mapRef.current = null;
+      geometryKeyRef.current = '';
+      opticsKeyRef.current = '';
       releaseOwned();
       setFilterId(null);
       return;
     }
+
     try {
-      let mapUrl: string;
-      let baseScale: number;
-      let shapeKey: string;
-      if (presetKey !== undefined && presetUrl !== undefined) {
-        if (!presetUrl) throw new Error('nico-glass-kit: glyph lens map rasterisation unavailable');
-        mapUrl = presetUrl;
-        baseScale = presetScale ?? 0;
-        shapeKey = presetKey;
-      } else {
-        const generated = generateLensMapImage({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
-        if (!generated.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
-        mapUrl = generated.dataUrl;
-        baseScale = generated.maxScale;
-        shapeKey = lensMapCacheKey({ width, height, radius, edge, curvature, strength, dpr, rasterScale });
-      }
-      baseScaleRef.current = baseScale;
-      const key = [
-        shapeKey,
-        `b${blur}`,
-        `sat${saturation}`,
-        `br${brightness}`,
-        `ab${animateBrightness ? 1 : 0}`,
-        `x${dispersion}`,
-        `sc${Math.round(baseScale * 100)}`,
-        shared ? 'shared' : instanceKey,
-      ].join('|');
-      const spec: GlassFilterSpec = {
-        key,
-        width: filterWidth,
-        height: filterHeight,
-        mapUrl,
-        scale: baseScale,
-        blur,
-        saturation,
-        brightness,
-        animateBrightness: animateBrightness ?? false,
-        dispersion,
-      };
-      // Only rounded rectangles with unchanged material may keep their private
-      // graph. Shared filters stay immutable; glyph presets keep their own key.
-      const resizeKey = !shared && presetKey === undefined
-        ? JSON.stringify([radius, edge, curvature, strength, dpr, rasterScale,
-            blur, saturation, brightness, animateBrightness, dispersion])
-        : null;
-      const owned = ownedRef.current;
-      if (owned?.registry === registry && owned.key === key) return;
-      if (owned?.registry === registry && resizeKey !== null &&
-          owned.resizeKey === resizeKey && registry.resize(owned.id, spec)) {
-        owned.key = key;
+      if (currentPreset) {
+        if (!currentPreset.url) {
+          throw new Error('nico-glass-kit: glyph lens map rasterisation unavailable');
+        }
+        // Glyph presets are already exact. Text/font/size changes are reflow,
+        // not optics: replace the preset synchronously.
+        const reflowKey = [
+          currentPreset.key,
+          currentPreset.url,
+          `${filterWidth}x${filterHeight}`,
+        ].join('|');
+        if (geometryKeyRef.current !== reflowKey || !mapRef.current) {
+          revisionRef.current++;
+          cancelLensMapOwner(owner);
+          requestedOpticsKeyRef.current = '';
+          mapRef.current = { dataUrl: currentPreset.url, shapeKey: currentPreset.key };
+          geometryKeyRef.current = reflowKey;
+          opticsKeyRef.current = '';
+        }
+        applyGraphRef.current();
         return;
       }
-      releaseOwned();
-      const id = registry.acquire(spec);
-      ownedRef.current = { registry, id, key, resizeKey };
-      setFilterId(id);
+
+      const options: LensMapOptions = { ...latest.map, skipDataUrl: false };
+      const geometryKey = lensMapGeometryKey(options);
+      const opticsKey = lensMapOpticsKey(options);
+      const plan = planLensMapUpdate({
+        hasMap: mapRef.current !== null,
+        geometryKey: geometryKeyRef.current,
+        opticsKey: opticsKeyRef.current,
+        requestedOpticsKey: requestedOpticsKeyRef.current,
+      }, {
+        geometryKey,
+        opticsKey,
+        workerAvailable: lensMapWorkerAvailable(),
+      });
+
+      if (plan.kind === 'sync') {
+        // First map and every size/DPR/export-scale change stay synchronous
+        // and commit before paint.
+        revisionRef.current++;
+        cancelLensMapOwner(owner);
+        requestedOpticsKeyRef.current = '';
+        const image: LensMapImage =
+          lookupLensMapImage(options) ?? generateLensMapImage(options);
+        if (!image.dataUrl) throw new Error('nico-glass-kit: lens map rasterisation unavailable');
+        mapRef.current = { dataUrl: image.dataUrl, shapeKey: image.cacheKey };
+        geometryKeyRef.current = geometryKey;
+        opticsKeyRef.current = opticsKey;
+        applyGraphRef.current();
+        return;
+      }
+
+      if (plan.kind === 'async') {
+        // A worker result for this geometry may already be in the split cache
+        // (e.g. the user dragged back). Commit it synchronously instead of
+        // submitting a round trip; this remains exact, not a preview.
+        const cachedImage = lookupLensMapImage(options);
+        if (cachedImage) {
+          revisionRef.current++;
+          cancelLensMapOwner(owner);
+          requestedOpticsKeyRef.current = '';
+          mapRef.current = { dataUrl: cachedImage.dataUrl, shapeKey: cachedImage.cacheKey };
+          geometryKeyRef.current = geometryKey;
+          opticsKeyRef.current = opticsKey;
+          applyGraphRef.current();
+          return;
+        }
+        if (plan.invalidate) revisionRef.current++;
+        if (plan.submit) {
+          const revision = revisionRef.current;
+          requestedOpticsKeyRef.current = opticsKey;
+          submitLensMapJob(owner, revision, options, (delivered, image) => {
+            const current = latestRef.current;
+            if (!current.enabled || current.preset) return;
+            let currentGeometry: string;
+            let currentOptics: string;
+            try {
+              const currentOptions: LensMapOptions = {
+                ...current.map,
+                skipDataUrl: false,
+              };
+              currentGeometry = lensMapGeometryKey(currentOptions);
+              currentOptics = lensMapOpticsKey(currentOptions);
+            } catch {
+              return;
+            }
+            // Latest-only: revision + current props must still describe the
+            // requested geometry/optics. This prevents a stale map commit
+            // even if a scheduler callback raced a reflow render.
+            if (!shouldCommitLensMapResult({
+              deliveredRevision: delivered,
+              currentRevision: revisionRef.current,
+              requestGeometryKey: geometryKey,
+              currentGeometryKey: currentGeometry,
+              requestOpticsKey: opticsKey,
+              currentOpticsKey: currentOptics,
+              enabled: current.enabled,
+              hasPreset: Boolean(current.preset),
+            })) return;
+            mapRef.current = { dataUrl: image.dataUrl, shapeKey: image.cacheKey };
+            geometryKeyRef.current = geometryKey;
+            opticsKeyRef.current = opticsKey;
+            requestedOpticsKeyRef.current = '';
+            applyGraphRef.current();
+            // Accepted async map: force the owning GlassSurface to render so
+            // useGlassRenderMember sees the new specRef.key and refreshes its
+            // batch atlas. Synchronous paths already run before that effect.
+            refreshRenderMember((value) => value + 1);
+          }, () => {
+            if (revisionRef.current !== revision) return;
+            // Worker and exact fallback both failed. Use the same recoverable
+            // CSS fallback as a synchronous encode failure, rather than
+            // silently keeping a map for different optical parameters.
+            revisionRef.current++;
+            cancelLensMapOwner(owner);
+            requestedOpticsKeyRef.current = '';
+            mapRef.current = null;
+            geometryKeyRef.current = opticsKeyRef.current = '';
+            releaseOwned();
+            setFilterId(null);
+          });
+        }
+        // Preview: old exact map, current strength/graph params. Never a
+        // lower-resolution fallback.
+        applyGraphRef.current();
+        return;
+      }
+
+      // Same exact map: blur/saturation/brightness/dispersion and strength
+      // are direct graph updates and never submit a map job.
+      if (plan.invalidate) {
+        revisionRef.current++;
+        cancelLensMapOwner(owner);
+        requestedOpticsKeyRef.current = '';
+      }
+      applyGraphRef.current();
     } catch {
+      revisionRef.current++;
+      cancelLensMapOwner(owner);
+      requestedOpticsKeyRef.current = '';
       releaseOwned();
       setFilterId(null);
-      return;
     }
   }, [
     registry,
@@ -445,6 +656,7 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     animateBrightness,
     dispersion,
     instanceKey,
+    owner,
   ]);
 
   // A replaced spring's cleanup must address its old graph, never the new
@@ -463,5 +675,5 @@ export function useGlassFilter(opts: UseGlassFilterOptions): UseGlassFilterResul
     [registry, filterId],
   );
 
-  return { filterId, baseScaleRef, setFilterScale, setFilterBrightness };
+  return { filterId, specRef, baseScaleRef, setFilterScale, setFilterBrightness };
 }

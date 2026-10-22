@@ -14,10 +14,15 @@
  *  - ignores mutations the library itself causes (see the `data-ngs-internal`
  *    zones) while still forwarding everything a real backdrop change needs
  *    (class swaps, `data-ngs-light`, childList);
- *  - skips probes for scrolls that cannot have changed an element's
- *    backdrop: elements that moved along with the scrolled content (their
- *    document-relative backdrop is unchanged) and scrollers that do not
- *    overlap the element.
+ *  - skips probes only when a scroll cannot have changed an element's
+ *    backdrop: a scroller that does not overlap an anchored element, or a
+ *    caller that explicitly proved its paint moves with the content. Merely
+ *    moving with the document flow is NOT proof: a fixed / attachment-fixed
+ *    backdrop (the playground default) still shows new pixels underneath an
+ *    in-flow element as it scrolls, so those probes stay conservative;
+ *  - measures the per-frame probe budget from the animation-frame timestamp
+ *    and rotates through targets, so a slow nine-point grid cannot repeatedly
+ *    take the whole slice and starve every other surface.
  *
  * The scroll decision and the mutation filter are pure and exported for
  * node tests; only the bottom section touches the DOM.
@@ -26,16 +31,39 @@
 import { consumeBackdropPaintChange, invalidateBackdropPaintInfo, onImagesSettled, withBackdropProbeBatch } from './backdropProbe';
 
 const PROBE_THROTTLE_MS = 120;
+// A nine-point grid is the unit of correctness, but it must not consume the
+// frame that renders the 60 Hz glass itself. Normal work and catch-up slices
+// stay at 6 ms, leaving the large majority of a 16.7 ms frame for style,
+// layout, paint and composite. Measured per-point costs stop the loop before
+// appending another known-expensive point; rotation plus deferred frames
+// completes the grid with bounded latency instead of one long task.
+// A detected paint change gets a larger, still sub-frame 8 ms priority slice
+// so a new colour/image is not queued behind motion samples. All budgets are
+// soft: a single native hit-test cannot be preempted, so one point may overrun
+// by its own cost. After such an overrun the loop stops instead of appending
+// more work to the already-late frame.
 const PROBE_BUDGET_MS = 6;
-// Resuming every point in a fresh frame repeats the costly first hit-test and
-// style flush. Give an unfinished grid a slightly larger catch-up slice, then
-// measure its cheaper continuation points. Keep the complete nine-point result
-// responsive instead of trading multi-second tint lag for smoother rAF numbers.
-const PROBE_CATCHUP_BUDGET_MS = 16;
-// Actual paint changes get a larger slice so new colours/images are not held
-// behind a slowly sampled motion queue. Native calls remain indivisible.
-const PROBE_PAINT_BUDGET_MS = 32;
+const PROBE_CATCHUP_BUDGET_MS = 6;
+const PROBE_PAINT_BUDGET_MS = 8;
+// A target's first native hit-test has no measured cost yet. Do not start a
+// second unmeasured target unless at least this much slice remains; if the
+// probes already run this frame cost more, use that larger measured floor. One
+// unknown call may overrun, but piling several unknown calls into a late frame
+// is avoidable. Known-expensive targets use their real first-point cost.
+const PROBE_UNMEASURED_ESTIMATE_MS = 3;
 const INTERNAL_ATTR = 'data-ngs-internal';
+// GlassRenderGroup writes these on the group root and on the internal effect
+// layer to describe render ownership/counts. They never affect what is painted
+// underneath a glass surface. Filter the exact names anywhere: the group root
+// is not inside a data-ngs-internal zone, and a broad prefix would risk hiding
+// a future attribute that does affect paint. `style` inside an internal zone
+// keeps the original filter rule below.
+const RENDER_BOOKKEEPING_ATTRS = new Set([
+  'data-ngs-render-batched',
+  'data-ngs-individual-filter',
+  'data-ngs-render-batches',
+  'data-ngs-render-members',
+]);
 /**
  * A `data-ngs-light` flip animates the tint over `--ngs-transition` (240 ms).
  * Probing before it settles would read the mid-transition colour and can lock
@@ -67,13 +95,24 @@ export interface ProbeTarget {
 /**
  * True for mutations the library itself causes. Layer zones
  * (`data-ngs-internal="style"` on .ngs-motion/.ngs-effect/.ngs-highlight/
- * .ngs-content) only mute their own `style` attribute writes; the filter
- * registry zone (`data-ngs-internal="all"` on the hidden SVG) mutes
- * everything inside it. Class swaps, `data-ngs-light` flips and childList
- * changes always pass through — they can be real backdrop changes (e.g. an
+ * .ngs-content) only mute their own `style` attribute writes; a zone marked
+ * `data-ngs-internal="all"` (the filter registry, or a diagnostic HUD whose
+ * 4 Hz text/level writes are not backdrop changes) mutes everything inside
+ * it. Render ownership/count attributes written by GlassRenderGroup are muted
+ * by their exact names wherever they appear; they do not change backdrop
+ * colour. Class swaps, `data-ngs-light` flips and childList changes in the
+ * page always pass through — they can be real backdrop changes (e.g. an
  * active tab pill that glass elements are stacked on top of).
  */
 export function isInternalMutation(record: MutationRecord): boolean {
+  if (
+    record.type === 'attributes' &&
+    record.attributeName !== null &&
+    record.attributeName !== undefined &&
+    RENDER_BOOKKEEPING_ATTRS.has(record.attributeName)
+  ) {
+    return true;
+  }
   const target = record.target as Element | null;
   if (!target || typeof target.closest !== 'function') return false;
   const zone = target.closest(`[${INTERNAL_ATTR}]`);
@@ -91,6 +130,44 @@ export function isInternalMutation(record: MutationRecord): boolean {
  */
 export function isLightFlipMutation(record: MutationRecord): boolean {
   return record.type === 'attributes' && record.attributeName === 'data-ngs-light';
+}
+
+export interface MutationBatchAnalysis {
+  /** At least one mutation outside a library-internal zone. */
+  real: boolean;
+  /** At least one real mutation is the library's own tint flip. */
+  lightFlip: boolean;
+  /**
+   * At least one real mutation can replace paint immediately (class swap,
+   * childList, non-style attribute). Inline style writes are excluded because
+   * pointer-tracked transforms are the common case; the probe still compares
+   * the paint it reads during the next sample.
+   */
+  urgent: boolean;
+}
+
+/**
+ * Classifies a MutationObserver batch once. Checking `some(isLightFlip)` before
+ * looking for real paint changes is a correctness trap: a batch that contains
+ * both a tint flip and a class/tree mutation would otherwise be deferred to
+ * the 260 ms settle timer and its real backdrop change would be missed until
+ * then. Internal records are discarded first, so they cannot hide a page
+ * mutation either.
+ */
+export function classifyMutations(records: readonly MutationRecord[]): MutationBatchAnalysis {
+  let real = false;
+  let lightFlip = false;
+  let urgent = false;
+  for (const record of records) {
+    if (isInternalMutation(record)) continue;
+    real = true;
+    if (isLightFlipMutation(record)) {
+      lightFlip = true;
+      continue;
+    }
+    if (record.type !== 'attributes' || record.attributeName !== 'style') urgent = true;
+  }
+  return { real, lightFlip, urgent };
 }
 
 /* ------------------------------------------------------------------ */
@@ -118,22 +195,42 @@ export interface ScrollProbeInput {
   offsets: ReadonlyMap<unknown, ScrollOffset>;
   /** Whether a scroller's visible area overlaps the element rect. */
   intersects: (scroller: unknown) => boolean;
+  /**
+   * Optional proof that the paint beneath the element translates 1:1 with
+   * this scroller's content. The scheduler cannot infer that from geometry:
+   * fixed / attachment-fixed backgrounds, parallax layers, or a sticky
+   * sibling painted below the glass all show different pixels even when the
+   * element moves exactly with the scrolled content. Return true only after
+   * verifying every layer that can show through the element; otherwise the
+   * conservative path re-samples.
+   */
+  paintMovesWithContent?: (scroller: unknown) => boolean;
 }
 
 const MOVE_EPSILON = 1;
 
 /**
  * Whether any scroller moved in a way that could have changed the paint
- * beneath the element:
- *  - moved along with the content (rect delta == scroller delta) → no;
- *  - anchored (rect unchanged) while a non-overlapping scroller scrolled → no;
- *  - anchored over an overlapping scroller, or moved abnormally (layout
- *    shift, sticky) → yes, conservatively.
+ * beneath the element.
+ *
+ * An element that moved with the scrolled content is NOT automatically safe
+ * to skip. Its viewport rect moving by `-scrollDelta` only proves that the
+ * element and the scroll box agree; it says nothing about what is painted
+ * behind it. A fixed wallpaper, `background-attachment: fixed`, a parallax
+ * layer, or a sticky sibling underneath still paints new pixels as the
+ * element travels, so the default is a conservative probe. A caller that has
+ * independently proven the paint co-moves may opt into the skip through
+ * {@link ScrollProbeInput.paintMovesWithContent}.
+ *
+ * The remaining safe skips are:
+ *  - no scroller moved;
+ *  - an anchored element and a scroller whose visible box does not overlap it;
+ *  - a proven co-moving paint layer (exact opposite rect delta).
  * Scrollers without a baseline only probe when they overlap the element
  * (rules out far-away inner scrollers on first sight).
  */
 export function decideScrollProbe(input: ScrollProbeInput): boolean {
-  const { rect, last, offsets, intersects } = input;
+  const { rect, last, offsets, intersects, paintMovesWithContent } = input;
   let probe = false;
   for (const [scroller, offset] of offsets) {
     const baseline = last?.offsets.get(scroller);
@@ -149,10 +246,14 @@ export function decideScrollProbe(input: ScrollProbeInput): boolean {
     const sameSize =
       Math.abs(rect.width - baseRect.width) < MOVE_EPSILON &&
       Math.abs(rect.height - baseRect.height) < MOVE_EPSILON;
+    // Scrolling down (positive dTop) moves in-flow content up, so a co-moving
+    // viewport rect has rect.top - baseRect.top === -dTop. Require the exact
+    // opposite sign for both axes before trusting the opt-in proof.
     const movedWithContent =
+      paintMovesWithContent?.(scroller) === true &&
       sameSize &&
-      Math.abs(rect.top - baseRect.top - dTop) < MOVE_EPSILON &&
-      Math.abs(rect.left - baseRect.left - dLeft) < MOVE_EPSILON;
+      Math.abs(rect.top - baseRect.top + dTop) < MOVE_EPSILON &&
+      Math.abs(rect.left - baseRect.left + dLeft) < MOVE_EPSILON;
     if (movedWithContent) continue;
     const anchored =
       sameSize &&
@@ -187,6 +288,10 @@ interface TargetEntry {
   taskSteps: number;
   lastStepCount: number;
   continuationCostMs: number;
+  /** Cost of this task's first point (the layout/style flush). */
+  firstStepCostMs: number;
+  /** Last completed task's first-point cost, used to predict a spill. */
+  lastFirstStepCostMs: number;
   urgent: boolean;
 }
 
@@ -237,6 +342,8 @@ function stopListening(): void {
     lightSettleTimer = 0;
   }
   activeScrollers.clear();
+  batchOffsets = null;
+  scrollBatchActive = false;
   batchCursor = 0;
 }
 
@@ -246,6 +353,12 @@ function onScroll(event: Event): void {
   scheduleBatch();
 }
 
+function clearTrailing(entry: TargetEntry): void {
+  if (entry.trailing === undefined) return;
+  window.clearTimeout(entry.trailing);
+  entry.trailing = undefined;
+}
+
 function onGenericTrigger(event?: Event, urgent = true): void {
   // Mutations/resizes may have changed what elements paint; the probe's
   // per-node background analysis cache must not outlive that.
@@ -253,23 +366,31 @@ function onGenericTrigger(event?: Event, urgent = true): void {
   for (const entry of entries.values()) {
     if (event?.type === 'visibilitychange') { entry.task?.return?.(); entry.task = null; }
     if (urgent) { entry.task?.return?.(); entry.task = null; entry.urgent = true; }
+    // An urgent trigger must not sit behind a throttle timer that was already
+    // superseded. tryRun still applies the throttle floor, but a stale timer
+    // would otherwise keep the entry out of hasRunnableWork until it fires.
+    if (urgent || event?.type === 'visibilitychange') clearTrailing(entry);
     entry.needsRun = true;
   }
   scheduleBatch();
 }
 
 function onMutations(records: MutationRecord[]): void {
-  if (records.every(isInternalMutation)) return;
+  const batch = classifyMutations(records);
+  if (!batch.real) return;
   // Light/Dark flips animate the tint: wait for the transition to settle so
-  // probes read the final colour instead of the intermediate one.
-  if (records.some(isLightFlipMutation)) {
-    scheduleSettledTrigger();
-    return;
+  // probes read the final colour instead of the intermediate one. A real paint
+  // change in the same batch must not be swallowed by that wait: apply it now
+  // and schedule the settled probe as well, so the final tint is still checked.
+  if (batch.lightFlip) scheduleSettledTrigger();
+  if (batch.urgent) {
+    onGenericTrigger(undefined, true);
+  } else if (!batch.lightFlip) {
+    // Style-only mutations are often transforms; still invalidate the paint
+    // cache and compare colours during the next actual sample, but with the
+    // normal rather than paint-change slice.
+    onGenericTrigger(undefined, false);
   }
-  // Class/tree changes can replace paint directly. Inline style mutations are
-  // often just transforms; compare the paint during the next actual sample.
-  onGenericTrigger(undefined, records.some(record => !isInternalMutation(record) &&
-    (record.type !== 'attributes' || record.attributeName !== 'style')));
 }
 
 function scheduleSettledTrigger(): void {
@@ -295,35 +416,88 @@ function hasRunnableWork(): boolean {
   return false;
 }
 
-function runBatch(): void {
+/**
+ * Cost to assume before starting this entry. A completed cheap grid can be
+ * predicted exactly; an expensive one is still allowed to start when its
+ * first measured point fits, because the remaining points can be split across
+ * frames. This keeps a single known-expensive first hit-test from blocking a
+ * second target without starving that target forever.
+ */
+function expectedRunCost(entry: TargetEntry): number {
+  if (entry.task) {
+    return Math.max(
+      entry.lastProbeCostMs,
+      entry.firstStepCostMs || entry.lastFirstStepCostMs,
+    );
+  }
+  if (entry.lastRunCostMs > 0) {
+    return entry.lastRunCostMs <= PROBE_BUDGET_MS
+      ? entry.lastRunCostMs
+      : Math.max(entry.lastFirstStepCostMs, entry.lastProbeCostMs);
+  }
+  return 0;
+}
+
+function runBatch(frameTime?: number): void {
   rafId = 0;
   if (document.hidden) return;
   if (consumeBackdropPaintChange()) promotePaintChange();
-  const start = now();
+  const startedAt = now();
+  // `requestAnimationFrame` reports when the frame began. If a long task
+  // delayed this callback, the remaining slice is smaller, so probe work cannot
+  // push an already late frame even further behind.
+  const frameStart =
+    typeof frameTime === 'number' && Number.isFinite(frameTime) && frameTime > 0
+      ? Math.min(frameTime, startedAt)
+      : startedAt;
   // Reading scrollY can flush layout. A wholly throttled batch must do no DOM
   // reads; take the shared snapshot lazily on its first real probe/scroll check.
   scrollBatchActive = true;
   try {
     withBackdropProbeBatch(() => {
-      const work = [...entries.values()];
-      const first = batchCursor % Math.max(1, work.length);
+      // Paint-urgent entries go first so a stale motion queue cannot hold a
+      // real background change behind ordinary scroll work. Within each group
+      // the cursor still rotates, so no surface monopolizes every frame.
+      const urgent: TargetEntry[] = [];
+      const normal: TargetEntry[] = [];
+      for (const entry of entries.values()) (entry.urgent ? urgent : normal).push(entry);
+      const work = urgent.concat(normal);
+      if (!work.length) return;
+      const first = batchCursor % work.length;
       let ranProbe = false;
+      let frameProbeCostMs = 0;
       for (let checked = 0; checked < work.length; checked++) {
         const index = (first + checked) % work.length;
         const entry = work[index];
+        // A target can unsubscribe (React cleanup) while this batch runs.
+        if (entries.get(entry.target) !== entry) continue;
         if (!entry.needsRun && !entry.scrollPending && !entry.task) continue;
         batchCursor = index;
-        if (now() - start > PROBE_BUDGET_MS) break;
+        // A single budget bounds the whole frame, not each target. Urgent paint
+        // work is allowed the larger slice; everything else stops at 6 ms.
+        const budget = entry.urgent ? PROBE_PAINT_BUDGET_MS : PROBE_BUDGET_MS;
+        if (now() - frameStart > budget) break;
         if (entry.scrollPending) decideScroll(entry);
         if (entry.task || (entry.needsRun && entry.trailing === undefined)) {
           // A slow native hit-test is indivisible. Learn its cost and avoid
           // starting a second expensive probe that would overrun this frame.
-          // Resume from that entry next frame so late subscribers cannot starve.
-          const predicted = !entry.task && entry.lastRunCostMs > 0 && entry.lastRunCostMs <= PROBE_BUDGET_MS
-            ? entry.lastRunCostMs : entry.lastProbeCostMs;
-          if (ranProbe && now() - start + predicted > PROBE_BUDGET_MS) break;
-          ranProbe = tryRun(entry, start + PROBE_BUDGET_MS) || ranProbe;
-          if (entry.task) break; // Resume this finite grid before rotating on.
+          // Unmeasured work uses a small floor so cheap first probes can still
+          // pack together without inviting several unknown native calls into
+          // an almost-spent frame. Unlike the old loop, do not stop the frame
+          // here: advance the cursor so the next frame services later
+          // subscribers before this grid resumes. That prevents a slow grid
+          // from starving every other one.
+          if (ranProbe) {
+            const predicted = expectedRunCost(entry) ||
+              Math.max(PROBE_UNMEASURED_ESTIMATE_MS, frameProbeCostMs);
+            if (now() - frameStart + predicted > budget) break;
+          }
+          const probeStart = now();
+          const ran = tryRun(entry, frameStart);
+          if (ran) {
+            ranProbe = true;
+            frameProbeCostMs = Math.max(frameProbeCostMs, now() - probeStart);
+          }
         }
         batchCursor = (index + 1) % work.length;
       }
@@ -332,11 +506,12 @@ function runBatch(): void {
   if (hasRunnableWork()) scheduleBatch();
 }
 
-function tryRun(entry: TargetEntry, deadline: number): boolean {
-  const batchStart = deadline - PROBE_BUDGET_MS;
+function tryRun(entry: TargetEntry, frameStart: number): boolean {
   const resuming = entry.task !== null;
-  if (entry.urgent) deadline = batchStart + PROBE_PAINT_BUDGET_MS;
-  else if (resuming) deadline = batchStart + PROBE_CATCHUP_BUDGET_MS;
+  const budget = entry.urgent
+    ? PROBE_PAINT_BUDGET_MS
+    : resuming ? PROBE_CATCHUP_BUDGET_MS : PROBE_BUDGET_MS;
+  let deadline = frameStart + budget;
   const fastCandidate = !entry.task && entry.lastRunCostMs > 0 && entry.lastRunCostMs <= PROBE_BUDGET_MS;
   if (!entry.task) {
     const elapsed = now() - entry.lastRunAt;
@@ -356,6 +531,7 @@ function tryRun(entry: TargetEntry, deadline: number): boolean {
       entry.taskCostMs = 0;
       entry.taskSteps = 0;
       entry.continuationCostMs = 0;
+      entry.firstStepCostMs = 0;
     }
   }
   if (entry.task) {
@@ -363,9 +539,11 @@ function tryRun(entry: TargetEntry, deadline: number): boolean {
     while (entry.task) {
       // The first point after a frame boundary includes a layout/style flush;
       // its cost overestimates subsequent points sharing this batch's DOM reads.
-      // Explore one continuation in the catch-up slice, then use measured cost.
+      // Let that first point run, then use the cost actually measured for the
+      // continuation. Never cap the prediction below the last measured point:
+      // doing so appends a second known-expensive sample and overruns the slice.
       const predicted = resuming
-        ? entry.continuationCostMs || Math.min(entry.lastProbeCostMs, 2)
+        ? entry.continuationCostMs || entry.lastProbeCostMs
         : entry.lastProbeCostMs;
       if (now() >= deadline || (ran && now() + predicted > deadline)) break;
       const start = now();
@@ -373,6 +551,7 @@ function tryRun(entry: TargetEntry, deadline: number): boolean {
       const cost = now() - start;
       if (ran) entry.continuationCostMs = cost;
       entry.taskCostMs += cost;
+      if (entry.taskSteps === 0) entry.firstStepCostMs = cost;
       if (consumeBackdropPaintChange()) {
         // A fresh first sample already reads the new paint. A partly sampled
         // old grid must restart so a black-to-white switch cannot average stale
@@ -380,7 +559,7 @@ function tryRun(entry: TargetEntry, deadline: number): boolean {
         // cannot re-enter a running generator.
         const keep = !step.done && entry.taskSteps === 0;
         promotePaintChange(keep ? entry : undefined);
-        deadline = batchStart + PROBE_PAINT_BUDGET_MS;
+        deadline = frameStart + PROBE_PAINT_BUDGET_MS;
         if (!keep) { ran = true; break; }
       }
       if (step.done) {
@@ -396,9 +575,17 @@ function tryRun(entry: TargetEntry, deadline: number): boolean {
           cost <= PROBE_BUDGET_MS / Math.max(1, entry.lastStepCount) && now() + remaining <= deadline) {
           const drainStart = now();
           let next = entry.task.next();
-          while (!next.done) { entry.taskSteps++; next = entry.task.next(); }
+          while (!next.done) {
+            entry.taskSteps++;
+            // A formerly cheap grid can slow down mid-drain. Allow that one
+            // indivisible point to overrun, but never start another after the
+            // deadline: the remaining points resume under the normal slice.
+            if (now() >= deadline) break;
+            next = entry.task.next();
+          }
           entry.taskCostMs += now() - drainStart;
-          completeTask(entry);
+          if (next.done) completeTask(entry);
+          else entry.lastProbeCostMs = Math.max(entry.lastProbeCostMs, now() - drainStart);
         }
       }
       ran = true;
@@ -410,6 +597,7 @@ function tryRun(entry: TargetEntry, deadline: number): boolean {
     refreshCheck(entry);
     entry.lastProbeCostMs = now() - probeStart;
     entry.lastRunCostMs = Math.max(0.001, entry.lastProbeCostMs);
+    entry.lastFirstStepCostMs = entry.lastProbeCostMs;
     entry.urgent = false;
     return true;
   }
@@ -420,12 +608,17 @@ function completeTask(entry: TargetEntry): void {
   entry.urgent = false;
   entry.lastRunCostMs = Math.max(0.001, entry.taskCostMs);
   entry.lastStepCount = entry.taskSteps;
+  entry.lastFirstStepCostMs = entry.firstStepCostMs;
+  entry.firstStepCostMs = 0;
   refreshCheck(entry);
 }
 
 function promotePaintChange(keep?: TargetEntry): void {
   for (const entry of entries.values()) {
     entry.urgent = true;
+    // A stale partial result must not be held behind a throttle timer while
+    // newer paint is waiting; tryRun applies the throttle floor on the retry.
+    clearTrailing(entry);
     if (entry !== keep) {
       entry.task?.return?.(); entry.task = null;
       entry.needsRun = true;
@@ -479,6 +672,22 @@ function rectOf(el: HTMLElement): ScrollRect {
   return { top: box.top, left: box.left, width: box.width, height: box.height };
 }
 
+/**
+ * True when the rect can show pixels. Offscreen surfaces keep their last
+ * decision; re-probing them on every scroll is pure waste and can starve
+ * visible surfaces. The scroll that brings one back into view triggers a
+ * fresh decision with the new rect. If the viewport cannot be measured
+ * (SSR/test stubs), stay conservative and probe.
+ */
+function rectIntersectsViewport(rect: ScrollRect): boolean {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  if (!(width > 0) || !(height > 0)) return true;
+  if (!(rect.width > 0) || !(rect.height > 0)) return false;
+  return rect.top < height && rect.top + rect.height > 0 &&
+    rect.left < width && rect.left + rect.width > 0;
+}
+
 /** Probe rect: the group's region when provided, else the element's box. */
 function targetRect(entry: TargetEntry): ScrollRect | null {
   if (entry.target.region) return entry.target.region();
@@ -495,6 +704,7 @@ function decideScroll(entry: TargetEntry): void {
   const last = entry.lastCheck;
   entry.lastCheck = { rect, offsets };
   if (entry.needsRun) return;
+  if (!rectIntersectsViewport(rect)) return;
   if (
     decideScrollProbe({
       rect,
@@ -532,6 +742,8 @@ export function subscribeProbe(target: ProbeTarget): () => void {
     taskSteps: 0,
     lastStepCount: 0,
     continuationCostMs: 0,
+    firstStepCostMs: 0,
+    lastFirstStepCostMs: 0,
     urgent: false,
   };
   entries.set(target, entry);
@@ -543,6 +755,7 @@ export function subscribeProbe(target: ProbeTarget): () => void {
     if (!existing) return;
     if (existing.trailing !== undefined) window.clearTimeout(existing.trailing);
     existing.task?.return?.();
+    existing.task = null;
     entries.delete(target);
     if (entries.size === 0) stopListening();
   };

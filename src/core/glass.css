@@ -1,5 +1,27 @@
 /* GlassSurface layer stack + Low tier styles (the base every tier builds on). */
 
+.ngs-render-group {
+  position: relative;
+}
+
+.ngs-render-host {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ngs-render-layer {
+  position: absolute;
+  pointer-events: none;
+}
+
+.ngs-render-defs {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .ngs-surface {
   position: relative;
   display: inline-block;

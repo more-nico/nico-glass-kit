@@ -6,7 +6,9 @@ vite.config.*.timestamp-*.mjs
 
 # local AI tooling (not published)
 .kilo/
+.codex/
 AGENTS.md
+!/AGENTS.md
 .benchmark-dist/
 .benchmark-baseline/
 benchmarks/results/

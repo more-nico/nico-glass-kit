@@ -4,14 +4,29 @@ import {
   clearGlyphRasterCache,
   computeGlyphLensPixels,
   generateGlyphRaster,
+  GLYPH_COVERAGE_CACHE_BYTES,
+  GLYPH_COVERAGE_CACHE_LIMIT,
+  GLYPH_ENCODED_CACHE_BYTES,
+  GLYPH_ENCODED_CACHE_LIMIT,
+  GLYPH_FIELD_CACHE_BYTES,
+  GLYPH_FIELD_CACHE_LIMIT,
+  GLYPH_MAP_CACHE_BYTES,
+  GLYPH_MAP_CACHE_LIMIT,
+  GLYPH_RING_CACHE_BYTES,
+  GLYPH_RING_CACHE_LIMIT,
+  glyphLayerCacheStats,
+  glyphRasterCacheEpoch,
   glyphRasterCacheKey,
   glyphRasterCacheStats,
   glyphRingAlpha,
   layoutGlyphs,
   measureTextMetrics,
+  previewGlyphRaster,
+  retainGlyphRaster,
   setGlyphRasterObserver,
   signedDistanceField,
   type GlyphMetrics,
+  type GlyphRaster,
   type GlyphRasterOptions,
 } from './glyphLensMap';
 
@@ -379,7 +394,7 @@ class FakeCanvas {
   width = 0;
   height = 0;
   private readonly ctx = new FakeContext();
-  getContext(): FakeContext {
+  getContext(_kind?: string, _options?: CanvasRenderingContext2DSettings): FakeContext {
     return this.ctx;
   }
   toDataURL(): string {
@@ -499,5 +514,134 @@ describe('glyph rasterisation (fake canvas)', () => {
     generateGlyphRaster({ ...RASTER, char: 'B' });
     expect(seen).toHaveLength(2);
     expect(glyphRasterCacheKey({ ...RASTER, char: 'B' })).not.toBe(glyphRasterCacheKey(RASTER));
+  });
+
+  it('keeps coverage, SDF, map, ring and PNG caches warm when only refraction changes', () => {
+    const before = glyphLayerCacheStats();
+    const first = generateGlyphRaster({ ...RASTER, refraction: 0.4 });
+    expect(first).not.toBeNull();
+    const afterFirst = glyphLayerCacheStats();
+    const afterFirstRaster = glyphRasterCacheStats();
+    expect(afterFirst.coverage.generated - before.coverage.generated).toBe(1);
+    expect(afterFirst.field.generated - before.field.generated).toBe(1);
+    expect(afterFirst.map.generated - before.map.generated).toBe(1);
+    expect(afterFirst.ring.generated - before.ring.generated).toBe(2);
+    expect(afterFirst.encoded.generated - before.encoded.generated).toBe(4);
+
+    const second = generateGlyphRaster({ ...RASTER, refraction: 0.8 });
+    const afterSecond = glyphLayerCacheStats();
+    expect(second).not.toBeNull();
+    // Refraction only folds into the SVG scale: every image is reused and no
+    // EDT, ring or PNG work repeats.
+    expect(second?.maskUrl).toBe(first?.maskUrl);
+    expect(second?.ringUrl).toBe(first?.ringUrl);
+    expect(second?.glintUrl).toBe(first?.glintUrl);
+    expect(second?.mapUrl).toBe(first?.mapUrl);
+    expect(second?.scale).toBeCloseTo((first?.scale ?? 0) * 2, 6);
+    for (const layer of ['coverage', 'field', 'map', 'ring', 'encoded'] as const) {
+      expect(afterSecond[layer].generated - afterFirst[layer].generated, layer).toBe(0);
+    }
+    // The full-raster key includes refraction, so this is a new public result
+    // assembled entirely from the cached layers.
+    expect(glyphRasterCacheStats().misses - afterFirstRaster.misses).toBe(1);
+  });
+
+  it('recomputes only the map when depth or curvature changes', () => {
+    generateGlyphRaster(RASTER);
+    const before = glyphLayerCacheStats();
+
+    generateGlyphRaster({ ...RASTER, depth: RASTER.depth + 6 });
+    const afterDepth = glyphLayerCacheStats();
+    expect(afterDepth.coverage.generated - before.coverage.generated).toBe(0);
+    expect(afterDepth.field.generated - before.field.generated).toBe(0);
+    expect(afterDepth.map.generated - before.map.generated).toBe(1);
+    expect(afterDepth.ring.generated - before.ring.generated).toBe(0);
+    expect(afterDepth.encoded.generated - before.encoded.generated).toBe(1);
+
+    generateGlyphRaster({ ...RASTER, curvature: 0.73 });
+    const afterCurvature = glyphLayerCacheStats();
+    expect(afterCurvature.coverage.generated - afterDepth.coverage.generated).toBe(0);
+    expect(afterCurvature.field.generated - afterDepth.field.generated).toBe(0);
+    expect(afterCurvature.map.generated - afterDepth.map.generated).toBe(1);
+    expect(afterCurvature.ring.generated - afterDepth.ring.generated).toBe(0);
+  });
+
+  it('adopts worker-encoded rasters so their layers feed later previews', () => {
+    const options = { ...RASTER, char: 'W', width: 44, height: 52 };
+    const raster: GlyphRaster = {
+      key: glyphRasterCacheKey(options),
+      maskUrl: 'data:image/png;base64,mask',
+      ringUrl: 'data:image/png;base64,ring',
+      glintUrl: 'data:image/png;base64,glint',
+      mapUrl: 'data:image/png;base64,map',
+      scale: 24 * 255 / 127,
+      width: options.width,
+      height: options.height,
+      pixelWidth: options.width,
+      pixelHeight: options.height,
+      edgeUsed: options.depth,
+      maxInside: 12.5,
+    };
+    retainGlyphRaster(raster, options);
+    const before = glyphLayerCacheStats();
+
+    const preview = previewGlyphRaster({ ...options, refraction: 0.31 });
+    expect(preview).not.toBeNull();
+    expect(preview?.mapUrl).toBe(raster.mapUrl);
+    expect(preview?.maxInside).toBe(12.5);
+    for (const layer of ['coverage', 'field', 'map', 'ring', 'encoded'] as const) {
+      expect(glyphLayerCacheStats()[layer].generated - before[layer].generated, layer).toBe(0);
+    }
+  });
+
+  it('rejects worker results that crossed a font-cache clear', () => {
+    const options = { ...RASTER, char: 'Q' };
+    const raster: GlyphRaster = {
+      key: glyphRasterCacheKey(options),
+      maskUrl: 'data:image/png;base64,mask',
+      ringUrl: 'data:image/png;base64,ring',
+      glintUrl: 'data:image/png;base64,glint',
+      mapUrl: 'data:image/png;base64,map',
+      scale: 24 * 255 / 127,
+      width: options.width,
+      height: options.height,
+      pixelWidth: options.width,
+      pixelHeight: options.height,
+      edgeUsed: options.depth,
+      maxInside: 10,
+    };
+    const staleEpoch = glyphRasterCacheEpoch();
+    clearGlyphRasterCache();
+    retainGlyphRaster(raster, options, staleEpoch);
+
+    expect(glyphRasterCacheStats().size).toBe(0);
+    expect(previewGlyphRaster(options)).toBeNull();
+    expect(glyphLayerCacheStats().encoded.size).toBe(0);
+  });
+
+  it('bounds every split cache by entry count and bytes', () => {
+    const count = GLYPH_FIELD_CACHE_LIMIT + 8;
+    for (let i = 0; i < count; i++) {
+      generateGlyphRaster({
+        ...RASTER,
+        char: String.fromCharCode(33 + (i % 90)),
+        width: 40 + (i % 3),
+      });
+    }
+    const layer = glyphLayerCacheStats();
+    expect(layer.coverage.size).toBeLessThanOrEqual(GLYPH_COVERAGE_CACHE_LIMIT);
+    expect(layer.field.size).toBeLessThanOrEqual(GLYPH_FIELD_CACHE_LIMIT);
+    expect(layer.map.size).toBeLessThanOrEqual(GLYPH_MAP_CACHE_LIMIT);
+    expect(layer.ring.size).toBeLessThanOrEqual(GLYPH_RING_CACHE_LIMIT);
+    expect(layer.encoded.size).toBeLessThanOrEqual(GLYPH_ENCODED_CACHE_LIMIT);
+    expect(layer.coverage.bytes).toBeLessThanOrEqual(GLYPH_COVERAGE_CACHE_BYTES);
+    expect(layer.field.bytes).toBeLessThanOrEqual(GLYPH_FIELD_CACHE_BYTES);
+    expect(layer.map.bytes).toBeLessThanOrEqual(GLYPH_MAP_CACHE_BYTES);
+    expect(layer.ring.bytes).toBeLessThanOrEqual(GLYPH_RING_CACHE_BYTES);
+    expect(layer.encoded.bytes).toBeLessThanOrEqual(GLYPH_ENCODED_CACHE_BYTES);
+    expect(layer.field.evictions).toBeGreaterThan(0);
+    expect(layer.map.evictions).toBeGreaterThan(0);
+    expect(layer.ring.evictions).toBeGreaterThan(0);
+    expect(layer.encoded.evictions).toBeGreaterThan(0);
   });
 });

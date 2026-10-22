@@ -89,10 +89,13 @@ test('slow native hit-tests yield between points and still update all surfaces',
     document.getElementById('background')!.style.transform='translateX(1px)';
   });
   await page.waitForFunction(()=>(window as unknown as {probeHitCount:()=>number}).probeHitCount()>=27);
-  // A new slow grid yields after its first point; resumed grids can take a
-  // bounded 16ms catch-up slice. They must never burst through all nine points.
-  expect(await page.evaluate(()=>(window as unknown as {maxProbeHits:()=>number}).maxProbeHits())).toBeLessThanOrEqual(4);
-  expect(await page.evaluate(()=>(window as unknown as {firstProbeHits:()=>number}).firstProbeHits())).toBe(1);
+  // A new slow grid yields after its first point. Normal/catch-up slices are
+  // 6 ms, and an urgent paint-change slice is 8 ms, so a frame may admit at
+  // most two 4 ms points. It must never burst through all nine.
+  expect(await page.evaluate(()=>(window as unknown as {maxProbeHits:()=>number}).maxProbeHits())).toBeLessThanOrEqual(2);
+  const firstProbeHits=await page.evaluate(()=>(window as unknown as {firstProbeHits:()=>number}).firstProbeHits());
+  expect(firstProbeHits).toBeGreaterThanOrEqual(1);
+  expect(firstProbeHits).toBeLessThanOrEqual(2);
   await page.evaluate(()=>{(window as unknown as {finishSlowProbe:()=>void}).finishSlowProbe();document.getElementById('background')!.style.backgroundColor='#ffffff';});
   for(let i=0;i<3;i++) await expect(page.locator(`[data-test="surface-${i}"]`)).toHaveAttribute('data-ngs-light','true');
 });
@@ -155,6 +158,10 @@ test('an image working set larger than the LRU settles once and preserves exact 
   await expect.poll(()=>page.evaluate(()=>window.glassTest.stats().images.pending)).toBe(0);
   expect(await page.evaluate(()=>window.__maxImageDecodes)).toBeLessThanOrEqual(4);
   expect(await page.evaluate(()=>window.glassTest.stats().images.size)).toBeLessThanOrEqual(32);
+  expect(await page.evaluate(()=>window.glassTest.stats().images.evictions)).toBeGreaterThanOrEqual(8);
+  // The 32-entry LRU has evicted at least eight bitmaps, but every first paint
+  // must have pre-registered all nine exact grid samples. Decode once, not once
+  // per point after eviction.
   expect(await page.evaluate(()=>window.__imageCreates)).toBe(40);
   // An image-settled notification must not keep resurrecting evicted images.
   await page.waitForTimeout(500);
