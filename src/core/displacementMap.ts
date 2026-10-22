@@ -124,14 +124,54 @@ export type LensMapImage = Omit<LensMapResult, 'pixels'>;
 const retainedBytes = (result: LensMapResult | LensMapImage): number =>
   ('pixels' in result ? result.pixels.byteLength : 0) + result.dataUrl.length * 2;
 
+/** Async-worker image cache: encoded maps only, split from the public cache. */
+export const LENS_MAP_IMAGE_CACHE_LIMIT = 64;
+export const LENS_MAP_IMAGE_CACHE_BYTES = 24 * 1024 * 1024;
+
+export interface LensMapImageCacheStats {
+  hits: number;
+  misses: number;
+  generated: number;
+  evictions: number;
+  size: number;
+  bytes: number;
+}
+
+interface LensImageEntry {
+  image: LensMapImage;
+  bytes: number;
+}
+
+const imageCache = new Map<string, LensImageEntry>();
+const imageStats: LensMapImageCacheStats = {
+  hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0,
+};
+/**
+ * Bumped by `clearLensMapCache`. Async worker keys carry this epoch so a
+ * reply that was in flight across a teardown cannot repopulate the new cache.
+ */
+let lensCacheEpoch = 0;
+
+export function lensMapCacheEpoch(): number {
+  return lensCacheEpoch;
+}
+
+export function lensMapImageCacheStats(): LensMapImageCacheStats {
+  return { ...imageStats, size: imageCache.size };
+}
+
 export function lensMapCacheStats(): LensMapCacheStats {
   return { ...stats, size: cache.size };
 }
 
 export function clearLensMapCache(): void {
+  lensCacheEpoch++;
   cache.clear();
   stats.size = 0;
   stats.bytes = 0;
+  imageCache.clear();
+  imageStats.size = 0;
+  imageStats.bytes = 0;
 }
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -195,6 +235,102 @@ export function lensMapCacheKey(options: LensMapOptions): string {
     `q:${round(shape.quality, 3)}`,
     `m:${round(shape.rasterScale, 3)}`,
   ].join(':');
+}
+
+/**
+ * Key for the rounded-rectangle *pixel* layer. Strength folds into the SVG
+ * scale and the export raster scale only affects the PNG, so neither belongs
+ * here: changing refraction never recomputes the field.
+ */
+export function lensMapPixelsCacheKey(options: LensMapOptions): string {
+  const shape = normaliseLensOptions(options);
+  return [
+    `${round(shape.width)}x${round(shape.height)}`,
+    `@${round(shape.quality, 3)}`,
+    `r:${round(shape.radius, 3)}`,
+    `e:${round(shape.edge, 3)}`,
+    `p:${round(shape.curvature, 4)}`,
+    `v:${lensCacheEpoch}`,
+  ].join(':');
+}
+
+/** Key for the encoded worker image (pixel layer + export raster scale). */
+export function lensMapImageCacheKey(options: LensMapOptions): string {
+  const shape = normaliseLensOptions(options);
+  return `${lensMapPixelsCacheKey(options)}:m:${round(shape.rasterScale, 3)}`;
+}
+
+/**
+ * Cache-only lookup used by the synchronous first-map / size-refresh path.
+ * Async worker results are registered here, so returning to a previously
+ * computed geometry stays synchronous without recomputing.
+ */
+export function lookupLensMapImage(options: LensMapOptions): LensMapImage | null {
+  const strengthScale = lensDisplacementScale(normaliseLensOptions(options).strength);
+  const key = lensMapImageCacheKey(options);
+  const entry = imageCache.get(key);
+  if (entry) {
+    imageStats.hits++;
+    imageCache.delete(key);
+    imageCache.set(key, entry);
+    return { ...entry.image, maxScale: strengthScale };
+  }
+
+  // First-map / size refreshes populate the public synchronous image cache.
+  // Reusing it here keeps a revisit (e.g. dragging back to an earlier radius)
+  // synchronous without touching the worker or recomputing pixels.
+  const publicKey = `${lensMapCacheKey({ ...options, strength: 1 })}:image:png`;
+  const publicEntry = cache.get(publicKey);
+  if (publicEntry && !('pixels' in publicEntry)) {
+    imageStats.hits++;
+    cache.delete(publicKey);
+    cache.set(publicKey, publicEntry);
+    return { ...publicEntry, maxScale: strengthScale };
+  }
+
+  imageStats.misses++;
+  return null;
+}
+
+/**
+ * Register an async worker image. `epoch` is captured at submit time; a reply
+ * from before `clearLensMapCache` is handed back to the caller but not cached.
+ */
+export function retainLensMapImage(
+  image: LensMapImage,
+  options: LensMapOptions,
+  epoch: number = lensCacheEpoch,
+): LensMapImage {
+  if (epoch !== lensCacheEpoch) return image;
+  const key = lensMapImageCacheKey(options);
+  const existing = imageCache.get(key);
+  if (existing) {
+    imageStats.hits++;
+    imageCache.delete(key);
+    imageCache.set(key, existing);
+    return {
+      ...existing.image,
+      maxScale: lensDisplacementScale(normaliseLensOptions(options).strength),
+    };
+  }
+  if (!image.dataUrl) return image;
+  const entry: LensImageEntry = { image: { ...image }, bytes: image.dataUrl.length * 2 };
+  imageCache.set(key, entry);
+  imageStats.generated++;
+  imageStats.bytes += entry.bytes;
+  while (imageCache.size > LENS_MAP_IMAGE_CACHE_LIMIT ||
+    imageStats.bytes > LENS_MAP_IMAGE_CACHE_BYTES) {
+    const oldest = imageCache.keys().next().value;
+    if (oldest === undefined) break;
+    imageStats.bytes -= imageCache.get(oldest)!.bytes;
+    imageCache.delete(oldest);
+    imageStats.evictions++;
+  }
+  imageStats.size = imageCache.size;
+  return {
+    ...entry.image,
+    maxScale: lensDisplacementScale(normaliseLensOptions(options).strength),
+  };
 }
 
 /**

@@ -1,5 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import {
+  glyphRasterWorkerAvailable,
+  glyphRasterWorkerPoolStats,
+  resetGlyphRasterWorkerPool,
+} from '../core/rasterWorkerPool';
 import { GlassText } from './GlassText';
 
 describe('GlassText server fallback', () => {
@@ -22,5 +27,16 @@ describe('GlassText server fallback', () => {
   it('normalises single-line controls and handles empty text', () => {
     expect(renderToStaticMarkup(<GlassText text={'A\n\t\rB\x00\x7f'} />)).toContain('A   B??');
     expect(renderToStaticMarkup(<GlassText text="" />)).toContain('ngs-text-fallback');
+  });
+
+  it('never creates a worker during SSR', () => {
+    resetGlyphRasterWorkerPool();
+    expect(glyphRasterWorkerAvailable()).toBe(false);
+    renderToStaticMarkup(<GlassText text="12:34" />);
+    expect(glyphRasterWorkerPoolStats()).toMatchObject({
+      workersCreated: 0,
+      activeWorkers: 0,
+      submitted: 0,
+    });
   });
 });

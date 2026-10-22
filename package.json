@@ -1,6 +1,6 @@
 {
   "name": "nico-glass-kit",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Apple-style glass (iOS 26) React component kit with tiered rendering",
   "type": "module",
   "license": "MIT",
@@ -34,11 +34,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:browser": "playwright test --config benchmarks/playwright.config.ts",
-    "test:release": "npm run typecheck && npm test && npm run test:browser && npm run build && npm run build:playground",
+    "test:release": "npm run typecheck && npm test && npm run test:browser && npm run build && npm run build:playground && npm run test:package",
     "bench:build": "vite build benchmarks --config benchmarks/vite.config.ts",
     "bench:serve": "vite preview benchmarks --config benchmarks/vite.config.ts --host 127.0.0.1 --port 4178 --strictPort",
     "bench:run": "node benchmarks/run.mjs",
-    "bench:compare": "node benchmarks/compare.mjs"
+    "bench:compare": "node benchmarks/compare.mjs",
+    "bench:playground": "node benchmarks/playground.mjs",
+    "test:metrics": "node --test benchmarks/lib/presentation.test.mjs",
+    "test:package": "node benchmarks/package-smoke.mjs"
   },
   "peerDependencies": {
     "react": ">=18",

@@ -12,6 +12,12 @@
  *
  * Encoding (hard constraint, shared with the rectangle path):
  *   R = 128 + dx * 127, G = 128 + dy * 127, B = 128, A = 255
+ *
+ * Caches are split so a material change does not repeat unrelated work:
+ *   coverage (font raster) → field/SDF → map pixels and ring alpha → encoded
+ *   PNGs. Only the map pixels depend on depth/curvature; refraction folds into
+ *   `feDisplacementMap@scale` and never invalidates an encoded map. Every
+ *   layer is an entry- and byte-bounded LRU (see `*_CACHE_*` constants).
  */
 
 import {
@@ -19,24 +25,47 @@ import {
   lensDisplacementScale,
   lensEdgePixels,
   clampLensMapRasterScale,
-  encodeDisplacement,
-  lensProfile,
-  renderPixelsToDataUrl,
+  lensMapRasterSize,
 } from './displacementMap';
+import {
+  DEFAULT_GLYPH_THRESHOLD,
+  GLYPH_GLINT_WIDTH,
+  MAX_GLYPH_RASTER_PIXELS,
+  alphaToWhiteRgba,
+  computeGlyphField,
+  computeGlyphLensPixelsFromField,
+  glyphRingAlpha,
+  type GlyphField,
+} from './rasterWorkerCompute';
 
 /** LRU size of the glyph raster cache (data URLs only, no pixel buffers). */
 export const GLYPH_RASTER_CACHE_LIMIT = 128;
 /** Retained encoded glyphs, in addition to the entry-count limit. */
 export const GLYPH_RASTER_CACHE_BYTES = 32 * 1024 * 1024;
-/** EDT needs many arrays per pixel; reject pathological tiles before allocating. */
-export const MAX_GLYPH_RASTER_PIXELS = 4 * 1024 * 1024;
+export { GLYPH_GLINT_WIDTH, MAX_GLYPH_RASTER_PIXELS, glyphRingAlpha };
+export type { GlyphField };
+
+/** Coverage arrays: one byte per physical pixel. */
+export const GLYPH_COVERAGE_CACHE_LIMIT = 96;
+export const GLYPH_COVERAGE_CACHE_BYTES = 16 * 1024 * 1024;
+/** SDF + normals: 12 bytes per physical pixel. */
+export const GLYPH_FIELD_CACHE_LIMIT = 64;
+export const GLYPH_FIELD_CACHE_BYTES = 40 * 1024 * 1024;
+/** RGBA displacement pixels: 4 bytes per physical pixel. */
+export const GLYPH_MAP_CACHE_LIMIT = 48;
+export const GLYPH_MAP_CACHE_BYTES = 32 * 1024 * 1024;
+/** Ring/glint alpha: one byte per physical pixel. */
+export const GLYPH_RING_CACHE_LIMIT = 96;
+export const GLYPH_RING_CACHE_BYTES = 8 * 1024 * 1024;
+/** PNG data URL strings (UTF-16 upper bound). */
+export const GLYPH_ENCODED_CACHE_LIMIT = 192;
+export const GLYPH_ENCODED_CACHE_BYTES = 24 * 1024 * 1024;
 
 /** Ink padding (CSS px) around every glyph tile: room for the ring band. */
 export const GLYPH_TILE_PADDING = 3;
 
 /** Static rim fades into the glyph over 3 CSS px; the pointer glint stays 2px. */
 export const DEFAULT_GLYPH_RING_WIDTH = 4;
-export const GLYPH_GLINT_WIDTH = 2;
 
 /**
  * Curved, closely spaced glyph boundaries need more map pixels than long
@@ -45,199 +74,12 @@ export const GLYPH_GLINT_WIDTH = 2;
  */
 export const GLYPH_RASTER_SCALE_MULTIPLIER = 2;
 
-/** Alpha at/above which a coverage pixel counts as inside the glyph. */
-const DEFAULT_GLYPH_THRESHOLD = 128;
-
 const clamp = (value: number, min: number, max: number): number =>
   value < min ? min : value > max ? max : value;
 
 function round(value: number, decimals = 6): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
-}
-
-const EDT_INF = 1e12;
-
-/**
- * Felzenszwalb & Huttenlocher exact squared-distance transform of one line,
- * including the index of the nearest feature pixel (argmin).
- */
-function edt1d(f: Float64Array, n: number, dist: Float64Array, arg: Int32Array,
-  v: Int32Array, z: Float64Array): void {
-  let k = 0;
-  v[0] = 0;
-  z[0] = -EDT_INF;
-  z[1] = EDT_INF;
-  for (let q = 1; q < n; q++) {
-    let s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-    while (s <= z[k]) {
-      k--;
-      s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-    }
-    k++;
-    v[k] = q;
-    z[k] = s;
-    z[k + 1] = EDT_INF;
-  }
-  k = 0;
-  for (let q = 0; q < n; q++) {
-    while (z[k + 1] < q) k++;
-    const delta = q - v[k];
-    dist[q] = delta * delta + f[v[k]];
-    arg[q] = v[k];
-  }
-}
-
-interface DistanceField {
-  /** Exact squared distance to the nearest feature pixel. */
-  dist: Float64Array;
-  /** Squared distance to the nearest feature pixel in the same column. */
-  colDist: Float64Array;
-  /** X index of the nearest feature pixel (argmin tracking only). */
-  argX: Int32Array | null;
-  /** Y index of the nearest feature pixel, per column (argmin tracking only). */
-  argY: Int32Array | null;
-}
-
-/** Separable 2D transform over a column-major (`x * height + y`) mask. */
-function distanceTransform2d(
-  mask: Uint8Array,
-  width: number,
-  height: number,
-  withArgmin: boolean,
-): DistanceField {
-  const n = width * height;
-  const colDist = new Float64Array(n);
-  const colArg = new Int32Array(withArgmin ? n : 0);
-  const dist = new Float64Array(n);
-  const argX = withArgmin ? new Int32Array(n) : null;
-  const line = new Float64Array(Math.max(width, height));
-  const lineOut = new Float64Array(Math.max(width, height));
-  const lineArg = new Int32Array(Math.max(width, height));
-  const vertices = new Int32Array(line.length);
-  const boundaries = new Float64Array(line.length + 1);
-
-  // Pass 1: columns. Every column has at least one feature (the padded ring).
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) line[y] = mask[x * height + y] ? 0 : EDT_INF;
-    edt1d(line, height, lineOut, lineArg, vertices, boundaries);
-    for (let y = 0; y < height; y++) {
-      colDist[x * height + y] = lineOut[y];
-      if (withArgmin) colArg[x * height + y] = lineArg[y];
-    }
-  }
-
-  // Pass 2: rows over the column distances.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) line[x] = colDist[x * height + y];
-    edt1d(line, width, lineOut, lineArg, vertices, boundaries);
-    for (let x = 0; x < width; x++) {
-      dist[x * height + y] = lineOut[x];
-      if (argX) argX[x * height + y] = lineArg[x];
-    }
-  }
-
-  return { dist, colDist, argX, argY: withArgmin ? colArg : null };
-}
-
-/** Squared distance to the nearest feature pixel in the same row. */
-function rowDistance(mask: Uint8Array, width: number, height: number): Float64Array {
-  const dist = new Float64Array(width * height);
-  const line = new Float64Array(width);
-  const lineOut = new Float64Array(width);
-  const lineArg = new Int32Array(width);
-  const vertices = new Int32Array(width);
-  const boundaries = new Float64Array(width + 1);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) line[x] = mask[x * height + y] ? 0 : EDT_INF;
-    edt1d(line, width, lineOut, lineArg, vertices, boundaries);
-    for (let x = 0; x < width; x++) dist[x * height + y] = lineOut[x];
-  }
-  return dist;
-}
-
-interface GlyphField {
-  /** Signed distance in physical px: negative inside, positive outside. */
-  sdf: Float32Array;
-  /** Outward normal X (inside pixels only; 0 outside). */
-  nx: Float32Array;
-  /** Outward normal Y (inside pixels only; 0 outside). */
-  ny: Float32Array;
-  /** Largest interior distance = half of the thickest stroke, physical px. */
-  maxInside: number;
-}
-
-/**
- * Builds the signed distance field of a coverage raster. A one-pixel outside
- * ring is materialised around the raster so the outer distance is exact and
- * `sd = ±(d - 0.5)` matches the pixel-centre convention of the rectangle SDF.
- */
-function computeGlyphField(
-  coverage: Uint8ClampedArray,
-  width: number,
-  height: number,
-  threshold: number,
-  wantNormals: boolean,
-): GlyphField {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 ||
-    (width + 2) * (height + 2) > MAX_GLYPH_RASTER_PIXELS) {
-    throw new RangeError('nico-glass-kit: glyph tile exceeds the safe allocation limit');
-  }
-  const pw = width + 2;
-  const ph = height + 2;
-  const n = pw * ph;
-
-  const inside = new Uint8Array(n);
-  const outside = new Uint8Array(n);
-  outside.fill(1);
-  // Both masks use the column-major layout of `distanceTransform2d`.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (coverage[y * width + x] >= threshold) {
-        const p = (x + 1) * ph + (y + 1);
-        inside[p] = 1;
-        outside[p] = 0;
-      }
-    }
-  }
-
-  const out = distanceTransform2d(outside, pw, ph, wantNormals);
-  const ins = distanceTransform2d(inside, pw, ph, false);
-  const rows = wantNormals ? rowDistance(outside, pw, ph) : null;
-
-  const sdf = new Float32Array(width * height);
-  const nx = new Float32Array(wantNormals ? width * height : 0);
-  const ny = new Float32Array(wantNormals ? width * height : 0);
-  let maxInside = 0;
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const p = (x + 1) * ph + (y + 1);
-      const j = y * width + x;
-      if (inside[p]) {
-        const d = Math.sqrt(out.dist[p]) - 0.5;
-        sdf[j] = -d;
-        if (d > maxInside) maxInside = d;
-        if (wantNormals && out.argX && out.argY && rows) {
-          const featureX = out.argX[p];
-          let dx = featureX - (x + 1);
-          let dy = out.argY[featureX * ph + (y + 1)] - (y + 1);
-          // Exact axis ties: the rectangle path prefers the Y axis (`qx > qy`).
-          if (rows[p] === out.colDist[p]) {
-            dx = 0;
-            dy = out.argY[p] - (y + 1);
-          }
-          const length = Math.hypot(dx, dy) || 1;
-          nx[j] = dx / length;
-          ny[j] = dy / length;
-        }
-      } else {
-        sdf[j] = Math.sqrt(ins.dist[p]) - 0.5;
-      }
-    }
-  }
-
-  return { sdf, nx, ny, maxInside };
 }
 
 /**
@@ -289,6 +131,9 @@ export interface GlyphLensResult {
 /**
  * Displacement map of a coverage raster. Outside pixels stay neutral (128) —
  * they are masked away, and the rim is where the refraction lives.
+ *
+ * Kept cache-free and pure so frozen pixel hashes stay reproducible; the
+ * renderer goes through the split caches in `generateGlyphRaster`.
  */
 export function computeGlyphLensPixels(
   coverage: Uint8ClampedArray,
@@ -307,63 +152,16 @@ export function computeGlyphLensPixels(
     options.threshold ?? DEFAULT_GLYPH_THRESHOLD,
     true,
   );
-  const { sdf, nx, ny, maxInside } = field;
+  const lens = computeGlyphLensPixelsFromField(field, {
+    width,
+    height,
+    edge: options.edge,
+    curvature,
+    strength,
+    quality,
+  });
 
-  const edgeUsed = lensEdgePixels(options.edge, quality);
-  const strengthUsed = strength;
-
-  const pixels = new Uint8ClampedArray(width * height * 4);
-  for (let j = 0; j < width * height; j++) {
-    let r = 128;
-    let g = 128;
-    const sd = sdf[j];
-    if (sd < 0) {
-      const t = clamp(-sd / edgeUsed, 0, 1);
-      const profile = lensProfile(t, curvature);
-      // Inward displacement, matching convex lensing.
-      r = encodeDisplacement(-nx[j] * profile);
-      g = encodeDisplacement(-ny[j] * profile);
-    }
-    const k = j * 4;
-    pixels[k] = r;
-    pixels[k + 1] = g;
-    pixels[k + 2] = 128;
-    pixels[k + 3] = 255;
-  }
-
-  return {
-    pixels,
-    maxScale: lensDisplacementScale(strengthUsed),
-    edgeUsed,
-    maxInside,
-    strengthUsed,
-    sdf,
-  };
-}
-
-/**
- * Inner outline band. Feathered bands fade smoothly from the contour to zero
- * at ringWidthPx inside the glyph; hard bands retain a pixel-wide transition.
- * Coverage clips the outer edge, including the edges of character holes.
- */
-export function glyphRingAlpha(
-  sdf: Float32Array,
-  width: number,
-  height: number,
-  ringWidthPx: number,
-  feather = false,
-): Uint8ClampedArray {
-  const alpha = new Uint8ClampedArray(width * height);
-  const ring = Math.max(0, ringWidthPx);
-  if (ring === 0) return alpha;
-  for (let i = 0; i < alpha.length; i++) {
-    if (sdf[i] >= 0) continue;
-    const t = clamp(1 + sdf[i] / ring, 0, 1);
-    alpha[i] = Math.round((feather
-      ? t * t * (3 - 2 * t)
-      : clamp(ring + sdf[i] + 0.5, 0, 1)) * 255);
-  }
-  return alpha;
+  return { ...lens, sdf: field.sdf };
 }
 
 /** Per-character metrics, ink relative to the pen origin / baseline, CSS px. */
@@ -521,7 +319,11 @@ export function measureTextMetrics(text: string, font: string, tabularNums = fal
   if (typeof document === 'undefined') return null;
   let ctx: CanvasRenderingContext2D | null = null;
   try {
-    ctx = document.createElement('canvas').getContext('2d');
+    // Measuring never draws: one reused canvas avoids a per-frame allocation
+    // during font-size drags. Resetting `fontKerning` keeps tabular and normal
+    // measurements independent of call order.
+    if (!measureCanvas) measureCanvas = document.createElement('canvas');
+    ctx = measureCanvas.getContext('2d');
   } catch {
     return null;
   }
@@ -529,7 +331,7 @@ export function measureTextMetrics(text: string, font: string, tabularNums = fal
 
   try {
     ctx.font = font;
-    if (tabularNums) ctx.fontKerning = 'none';
+    ctx.fontKerning = tabularNums ? 'none' : 'auto';
     const digitAdvance = Math.max(...Array.from('0123456789', (digit) => ctx!.measureText(digit).width));
     const glyphs: GlyphMetrics[] = [];
     let previous = 0;
@@ -637,19 +439,195 @@ export function setGlyphRasterObserver(next: GlyphRasterObserver | null): void {
   observer = next;
 }
 
+interface LayerCacheStats {
+  hits: number;
+  misses: number;
+  generated: number;
+  evictions: number;
+  size: number;
+  bytes: number;
+}
+
+export interface GlyphLayerCacheStats {
+  coverage: LayerCacheStats;
+  field: LayerCacheStats;
+  map: LayerCacheStats;
+  ring: LayerCacheStats;
+  encoded: LayerCacheStats;
+}
+
+interface Metered {
+  bytes: number;
+}
+
+interface CacheMeter {
+  stats: LayerCacheStats;
+  limit: number;
+  byteLimit: number;
+}
+
+interface CoverageEntry extends Metered {
+  coverage: Uint8ClampedArray;
+}
+
+interface FieldEntry extends Metered {
+  field: GlyphField;
+}
+
+interface MapEntry extends Metered {
+  pixels: Uint8ClampedArray;
+}
+
+interface RingEntry extends Metered {
+  alpha: Uint8ClampedArray;
+}
+
+interface EncodedEntry extends Metered {
+  url: string;
+  /** Carried so a preview can report the same metadata as a full raster. */
+  maxInside?: number;
+}
+
 const cache = new Map<string, GlyphRaster>();
+/**
+ * Bumped by `clearGlyphRasterCache` (font reloads, explicit teardown). It is
+ * folded into every layer key so an in-flight worker reply from before the
+ * clear can never be retained as current, and old worker entries become
+ * unreachable instead of colliding with the reloaded font.
+ */
+let cacheEpoch = 0;
 const stats: GlyphRasterCacheStats = { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 };
 const rasterBytes = (raster: GlyphRaster): number =>
   (raster.maskUrl.length + raster.ringUrl.length + raster.glintUrl.length + raster.mapUrl.length) * 2;
+
+const coverageCache = new Map<string, CoverageEntry>();
+const fieldCache = new Map<string, FieldEntry>();
+const mapCache = new Map<string, MapEntry>();
+const ringCache = new Map<string, RingEntry>();
+const encodedCache = new Map<string, EncodedEntry>();
+
+const coverageMeter: CacheMeter = {
+  stats: { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 },
+  limit: GLYPH_COVERAGE_CACHE_LIMIT,
+  byteLimit: GLYPH_COVERAGE_CACHE_BYTES,
+};
+const fieldMeter: CacheMeter = {
+  stats: { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 },
+  limit: GLYPH_FIELD_CACHE_LIMIT,
+  byteLimit: GLYPH_FIELD_CACHE_BYTES,
+};
+const mapMeter: CacheMeter = {
+  stats: { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 },
+  limit: GLYPH_MAP_CACHE_LIMIT,
+  byteLimit: GLYPH_MAP_CACHE_BYTES,
+};
+const ringMeter: CacheMeter = {
+  stats: { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 },
+  limit: GLYPH_RING_CACHE_LIMIT,
+  byteLimit: GLYPH_RING_CACHE_BYTES,
+};
+const encodedMeter: CacheMeter = {
+  stats: { hits: 0, misses: 0, generated: 0, evictions: 0, size: 0, bytes: 0 },
+  limit: GLYPH_ENCODED_CACHE_LIMIT,
+  byteLimit: GLYPH_ENCODED_CACHE_BYTES,
+};
+
+function layerSnapshot(meter: CacheMeter): LayerCacheStats {
+  return { ...meter.stats, size: meter.stats.size };
+}
+
+export function glyphLayerCacheStats(): GlyphLayerCacheStats {
+  return {
+    coverage: layerSnapshot(coverageMeter),
+    field: layerSnapshot(fieldMeter),
+    map: layerSnapshot(mapMeter),
+    ring: layerSnapshot(ringMeter),
+    encoded: layerSnapshot(encodedMeter),
+  };
+}
 
 export function glyphRasterCacheStats(): GlyphRasterCacheStats {
   return { ...stats, size: cache.size };
 }
 
+function clearLayer<T extends Metered>(
+  map: Map<string, T>,
+  meter: CacheMeter,
+): void {
+  map.clear();
+  meter.stats.size = 0;
+  meter.stats.bytes = 0;
+}
+
+export function glyphRasterCacheEpoch(): number {
+  return cacheEpoch;
+}
+
 export function clearGlyphRasterCache(): void {
+  cacheEpoch++;
   cache.clear();
   stats.size = 0;
   stats.bytes = 0;
+  clearLayer(coverageCache, coverageMeter);
+  clearLayer(fieldCache, fieldMeter);
+  clearLayer(mapCache, mapMeter);
+  clearLayer(ringCache, ringMeter);
+  clearLayer(encodedCache, encodedMeter);
+  // Drop the reusable CPU canvases too: a font reload must not retain the old
+  // raster's backing store.
+  measureCanvas = null;
+  textCanvas = null;
+  alphaCanvas = null;
+  alphaCanvasWidth = 0;
+  alphaCanvasHeight = 0;
+  mapSourceCanvas = null;
+  mapSourceWidth = 0;
+  mapSourceHeight = 0;
+  mapTargetCanvas = null;
+  mapTargetWidth = 0;
+  mapTargetHeight = 0;
+}
+
+function layerGet<T extends Metered>(
+  map: Map<string, T>,
+  key: string,
+  meter: CacheMeter,
+): T | undefined {
+  const value = map.get(key);
+  if (value) {
+    meter.stats.hits++;
+    // Refresh LRU recency.
+    map.delete(key);
+    map.set(key, value);
+    return value;
+  }
+  meter.stats.misses++;
+  return undefined;
+}
+
+function layerPut<T extends Metered>(
+  map: Map<string, T>,
+  key: string,
+  value: T,
+  meter: CacheMeter,
+): void {
+  const previous = map.get(key);
+  if (previous) {
+    meter.stats.bytes -= previous.bytes;
+    map.delete(key);
+  }
+  map.set(key, value);
+  meter.stats.bytes += value.bytes;
+  meter.stats.generated++;
+  while (map.size > meter.limit || meter.stats.bytes > meter.byteLimit) {
+    const oldest = map.keys().next().value;
+    if (oldest === undefined) break;
+    const evicted = map.get(oldest)!;
+    meter.stats.bytes -= evicted.bytes;
+    map.delete(oldest);
+    meter.stats.evictions++;
+  }
+  meter.stats.size = map.size;
 }
 
 /** Stable cache key: everything the raster depends on. */
@@ -672,48 +650,119 @@ export function glyphRasterCacheKey(options: GlyphRasterOptions): string {
   ].join('|');
 }
 
-/** White RGB with the given alpha, as a PNG data URL. */
-function renderAlphaToDataUrl(
-  alpha: Uint8ClampedArray,
-  width: number,
-  height: number,
-): string {
+export interface GlyphRasterPartKeys {
+  /** Font raster (independent of every optic). */
+  coverageKey: string;
+  /** SDF + normals. */
+  fieldKey: string;
+  /** Displacement pixels (depth/curvature, not refraction). */
+  mapKey: string;
+  /** Feathered outline alpha. */
+  ringKey: string;
+  /** Hard pointer glint alpha. */
+  glintKey: string;
+  /** Coverage PNG. */
+  maskKey: string;
+  /** Displacement PNG (includes the export raster scale). */
+  mapUrlKey: string;
+}
+
+export interface NormalisedGlyphRaster {
+  /** Cache epoch captured when the keys were derived (font reloads bump it). */
+  epoch: number;
+  quality: number;
+  rasterScale: number;
+  pixelWidth: number;
+  pixelHeight: number;
+  keys: GlyphRasterPartKeys;
+}
+
+/**
+ * Derives every split-cache key for a glyph. Coverage/SDF/ring ignore
+ * depth/curvature/refraction; the map key ignores refraction, so dragging the
+ * refraction slider reuses the same encoded map and only changes `scale`.
+ */
+export function normaliseGlyphRaster(options: GlyphRasterOptions): NormalisedGlyphRaster {
+  const quality = clamp(options.dpr ?? 1, 0.25, 4);
+  const rasterScale = clampLensMapRasterScale(
+    options.rasterScale ?? defaultGlyphRasterScale(undefined),
+  );
+  const pixelWidth = Math.max(1, Math.round(options.width * quality));
+  const pixelHeight = Math.max(1, Math.round(options.height * quality));
+  const coverageKey = [
+    options.char,
+    options.font,
+    `${pixelWidth}x${pixelHeight}`,
+    `p:${round(options.penX, 3)},${round(options.baseline, 3)}`,
+    `@${round(quality, 3)}`,
+    `v:${cacheEpoch}`,
+  ].join('|');
+  const fieldKey = `${coverageKey}|t:${DEFAULT_GLYPH_THRESHOLD}`;
+  const edgeUsed = lensEdgePixels(options.depth, quality);
+  const mapKey = `${fieldKey}|e:${round(edgeUsed, 4)}|c:${round(clamp(options.curvature, 0, 1), 4)}`;
+  const ringWidthPx = Math.max(0, options.ringWidth ?? DEFAULT_GLYPH_RING_WIDTH) * quality;
+  const glintWidthPx = GLYPH_GLINT_WIDTH * quality;
+  const ringKey = `${fieldKey}|r:${round(ringWidthPx, 3)}|f:1`;
+  const glintKey = `${fieldKey}|r:${round(glintWidthPx, 3)}|f:0`;
+  return {
+    epoch: cacheEpoch,
+    quality,
+    rasterScale,
+    pixelWidth,
+    pixelHeight,
+    keys: {
+      coverageKey,
+      fieldKey,
+      mapKey,
+      ringKey,
+      glintKey,
+      maskKey: `${coverageKey}|mask`,
+      mapUrlKey: `${mapKey}|@${round(rasterScale, 3)}`,
+    },
+  };
+}
+
+/**
+ * CPU canvas used to rasterise glyph coverage. `willReadFrequently` keeps the
+ * bitmap on the CPU: `getImageData` would otherwise flush the compositor on
+ * every font-size frame.
+ */
+let measureCanvas: HTMLCanvasElement | null = null;
+let textCanvas: HTMLCanvasElement | null = null;
+let alphaCanvas: HTMLCanvasElement | null = null;
+let alphaCanvasWidth = 0;
+let alphaCanvasHeight = 0;
+let mapSourceCanvas: HTMLCanvasElement | null = null;
+let mapSourceWidth = 0;
+let mapSourceHeight = 0;
+let mapTargetCanvas: HTMLCanvasElement | null = null;
+let mapTargetWidth = 0;
+let mapTargetHeight = 0;
+
+function acquireTextCanvas(width: number, height: number): HTMLCanvasElement | null {
   try {
-    if (typeof document === 'undefined') return '';
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-    const image = ctx.createImageData(width, height);
-    const data = image.data;
-    for (let i = 0; i < alpha.length; i++) {
-      data[i * 4] = 255;
-      data[i * 4 + 1] = 255;
-      data[i * 4 + 2] = 255;
-      data[i * 4 + 3] = alpha[i];
-    }
-    ctx.putImageData(image, 0, 0);
-    return canvas.toDataURL('image/png');
+    if (!textCanvas) textCanvas = document.createElement('canvas');
+    // Assigning the size always resets the bitmap and the 2D state, which is
+    // exactly the clean canvas `fillText` needs.
+    textCanvas.width = width;
+    textCanvas.height = height;
+    return textCanvas;
   } catch {
-    return '';
+    return null;
   }
 }
 
-function rasteriseGlyph(options: GlyphRasterOptions): Omit<GlyphRaster, 'key'> | null {
-  if (typeof document === 'undefined') return null;
-  const quality = clamp(options.dpr ?? 1, 0.25, 4);
-  const pixelWidth = Math.max(1, Math.round(options.width * quality));
-  const pixelHeight = Math.max(1, Math.round(options.height * quality));
+function rasteriseCoverage(options: GlyphRasterOptions, normalised: NormalisedGlyphRaster): Uint8ClampedArray | null {
+  const { pixelWidth, pixelHeight, quality } = normalised;
   if (!Number.isFinite(pixelWidth) || !Number.isFinite(pixelHeight) ||
     (pixelWidth + 2) * (pixelHeight + 2) > MAX_GLYPH_RASTER_PIXELS) return null;
+  if (typeof document === 'undefined') return null;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = pixelWidth;
-  canvas.height = pixelHeight;
+  const canvas = acquireTextCanvas(pixelWidth, pixelHeight);
+  if (!canvas) return null;
   let ctx: CanvasRenderingContext2D | null = null;
   try {
-    ctx = canvas.getContext('2d');
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
   } catch {
     return null;
   }
@@ -734,42 +783,318 @@ function rasteriseGlyph(options: GlyphRasterOptions): Omit<GlyphRaster, 'key'> |
   }
   const coverage = new Uint8ClampedArray(pixelWidth * pixelHeight);
   for (let i = 0; i < coverage.length; i++) coverage[i] = image.data[i * 4 + 3];
+  return coverage;
+}
 
-  const lens = computeGlyphLensPixels(coverage, {
-    width: pixelWidth,
-    height: pixelHeight,
+/**
+ * Main-thread coverage rasterisation (font drawing must stay here: a worker
+ * would resolve a different font set). Cached separately from every optic.
+ */
+export function prepareGlyphCoverage(
+  options: GlyphRasterOptions,
+): { coverage: Uint8ClampedArray; normalised: NormalisedGlyphRaster } | null {
+  const normalised = normaliseGlyphRaster(options);
+  const cached = layerGet(coverageCache, normalised.keys.coverageKey, coverageMeter);
+  if (cached) return { coverage: cached.coverage, normalised };
+
+  const coverage = rasteriseCoverage(options, normalised);
+  if (!coverage) return null;
+  layerPut(coverageCache, normalised.keys.coverageKey, {
+    coverage,
+    bytes: coverage.byteLength,
+  }, coverageMeter);
+  return { coverage, normalised };
+}
+
+function getField(
+  normalised: NormalisedGlyphRaster,
+  coverage: Uint8ClampedArray,
+): GlyphField | null {
+  const cached = layerGet(fieldCache, normalised.keys.fieldKey, fieldMeter);
+  if (cached) return cached.field;
+
+  let field: GlyphField;
+  try {
+    field = computeGlyphField(
+      coverage,
+      normalised.pixelWidth,
+      normalised.pixelHeight,
+      DEFAULT_GLYPH_THRESHOLD,
+      true,
+    );
+  } catch {
+    return null;
+  }
+  layerPut(fieldCache, normalised.keys.fieldKey, {
+    field,
+    bytes: field.sdf.byteLength + field.nx.byteLength + field.ny.byteLength,
+  }, fieldMeter);
+  return field;
+}
+
+interface MapPixels {
+  pixels: Uint8ClampedArray;
+  edgeUsed: number;
+  maxInside: number;
+}
+
+function getMapPixels(
+  options: GlyphRasterOptions,
+  normalised: NormalisedGlyphRaster,
+  field: GlyphField,
+): MapPixels | null {
+  const cached = layerGet(mapCache, normalised.keys.mapKey, mapMeter);
+  if (cached) {
+    return {
+      pixels: cached.pixels,
+      edgeUsed: lensEdgePixels(options.depth, normalised.quality),
+      maxInside: field.maxInside,
+    };
+  }
+
+  const lens = computeGlyphLensPixelsFromField(field, {
+    width: normalised.pixelWidth,
+    height: normalised.pixelHeight,
     edge: options.depth,
     curvature: options.curvature,
     strength: options.refraction,
-    quality,
+    quality: normalised.quality,
   });
-  const ring = glyphRingAlpha(
-    lens.sdf,
-    pixelWidth,
-    pixelHeight,
-    Math.max(0, options.ringWidth ?? DEFAULT_GLYPH_RING_WIDTH) * quality,
-    true,
+  layerPut(mapCache, normalised.keys.mapKey, {
+    pixels: lens.pixels,
+    bytes: lens.pixels.byteLength,
+  }, mapMeter);
+  return { pixels: lens.pixels, edgeUsed: lens.edgeUsed, maxInside: lens.maxInside };
+}
+
+function getRingAlpha(
+  normalised: NormalisedGlyphRaster,
+  field: GlyphField,
+  key: string,
+  widthPx: number,
+  feather: boolean,
+): Uint8ClampedArray {
+  const cached = layerGet(ringCache, key, ringMeter);
+  if (cached) return cached.alpha;
+  const alpha = glyphRingAlpha(
+    field.sdf,
+    normalised.pixelWidth,
+    normalised.pixelHeight,
+    widthPx,
+    feather,
   );
-  const glint = glyphRingAlpha(lens.sdf, pixelWidth, pixelHeight, GLYPH_GLINT_WIDTH * quality);
-  const rasterScale = clampLensMapRasterScale(
-    options.rasterScale ?? defaultGlyphRasterScale(undefined),
-  );
+  layerPut(ringCache, key, { alpha, bytes: alpha.byteLength }, ringMeter);
+  return alpha;
+}
+
+/** White RGB with the given alpha, reused CPU canvas. */
+function encodeAlphaToDataUrl(
+  alpha: Uint8ClampedArray,
+  width: number,
+  height: number,
+): string {
+  try {
+    if (typeof document === 'undefined') return '';
+    if (!alphaCanvas) alphaCanvas = document.createElement('canvas');
+    if (alphaCanvasWidth !== width || alphaCanvasHeight !== height) {
+      alphaCanvas.width = width;
+      alphaCanvas.height = height;
+      alphaCanvasWidth = width;
+      alphaCanvasHeight = height;
+    }
+    const ctx = alphaCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return '';
+    const image = ctx.createImageData(width, height);
+    image.data.set(alphaToWhiteRgba(alpha));
+    ctx.putImageData(image, 0, 0);
+    return alphaCanvas.toDataURL('image/png');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * RGBA displacement → downsampled PNG on reused CPU canvases. The source is
+ * fully opaque, so `putImageData`/`drawImage` overwrite every destination
+ * pixel and no per-frame clear is needed.
+ */
+function encodePixelsToDataUrl(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  scale: number,
+): string {
+  try {
+    if (typeof document === 'undefined') return '';
+    if (!mapSourceCanvas) mapSourceCanvas = document.createElement('canvas');
+    if (mapSourceWidth !== width || mapSourceHeight !== height) {
+      mapSourceCanvas.width = width;
+      mapSourceCanvas.height = height;
+      mapSourceWidth = width;
+      mapSourceHeight = height;
+    }
+    const sourceCtx = mapSourceCanvas.getContext('2d', { willReadFrequently: true });
+    if (!sourceCtx) return '';
+    sourceCtx.putImageData(new ImageData(pixels, width, height), 0, 0);
+
+    const raster = lensMapRasterSize(width, height, scale);
+    if (raster.width === width && raster.height === height) {
+      return mapSourceCanvas.toDataURL('image/png');
+    }
+
+    if (!mapTargetCanvas) mapTargetCanvas = document.createElement('canvas');
+    if (mapTargetWidth !== raster.width || mapTargetHeight !== raster.height) {
+      mapTargetCanvas.width = raster.width;
+      mapTargetCanvas.height = raster.height;
+      mapTargetWidth = raster.width;
+      mapTargetHeight = raster.height;
+    }
+    const targetCtx = mapTargetCanvas.getContext('2d', { willReadFrequently: true });
+    if (!targetCtx) return '';
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
+    targetCtx.drawImage(mapSourceCanvas, 0, 0, raster.width, raster.height);
+    return mapTargetCanvas.toDataURL('image/png');
+  } catch {
+    return '';
+  }
+}
+
+function getEncoded(
+  key: string,
+  encode: () => string,
+  maxInside?: number,
+): string {
+  const cached = layerGet(encodedCache, key, encodedMeter);
+  if (cached) return cached.url;
+  const url = encode();
+  // A failed PNG encode is retryable and must not hide the readable fallback.
+  if (!url) return '';
+  layerPut(encodedCache, key, {
+    url,
+    bytes: url.length * 2,
+    ...(maxInside === undefined ? null : { maxInside }),
+  }, encodedMeter);
+  return url;
+}
+
+interface EncodedRasterParts {
+  maskUrl: string;
+  ringUrl: string;
+  glintUrl: string;
+  mapUrl: string;
+}
+
+function peekEncoded(key: string): EncodedEntry | undefined {
+  const entry = encodedCache.get(key);
+  if (!entry) return undefined;
+  // Preview lookups should not let a hot layer fall out just because only
+  // the full raster cache counted as a hit.
+  encodedCache.delete(key);
+  encodedCache.set(key, entry);
+  return entry;
+}
+
+function lookupEncodedParts(
+  normalised: NormalisedGlyphRaster,
+): EncodedRasterParts | null {
+  const mask = peekEncoded(normalised.keys.maskKey);
+  const ring = peekEncoded(normalised.keys.ringKey);
+  const glint = peekEncoded(normalised.keys.glintKey);
+  const map = peekEncoded(normalised.keys.mapUrlKey);
+  if (!mask || !ring || !glint || !map) return null;
+  return { maskUrl: mask.url, ringUrl: ring.url, glintUrl: glint.url, mapUrl: map.url };
+}
+
+function rasteriseWithCoverage(
+  options: GlyphRasterOptions,
+  coverage: Uint8ClampedArray,
+  normalised: NormalisedGlyphRaster,
+): Omit<GlyphRaster, 'key'> | null {
+  const field = getField(normalised, coverage);
+  if (!field) return null;
+  const map = getMapPixels(options, normalised, field);
+  if (!map) return null;
+
+  const ringWidthPx = Math.max(0, options.ringWidth ?? DEFAULT_GLYPH_RING_WIDTH) * normalised.quality;
+  const glintWidthPx = GLYPH_GLINT_WIDTH * normalised.quality;
+  const ring = getRingAlpha(normalised, field, normalised.keys.ringKey, ringWidthPx, true);
+  const glint = getRingAlpha(normalised, field, normalised.keys.glintKey, glintWidthPx, false);
+
+  let maskUrl = '';
+  let ringUrl = '';
+  let glintUrl = '';
+  let mapUrl = '';
+  if (!options.skipDataUrl) {
+    maskUrl = getEncoded(
+      normalised.keys.maskKey,
+      () => encodeAlphaToDataUrl(coverage, normalised.pixelWidth, normalised.pixelHeight),
+    );
+    ringUrl = getEncoded(
+      normalised.keys.ringKey,
+      () => encodeAlphaToDataUrl(ring, normalised.pixelWidth, normalised.pixelHeight),
+    );
+    glintUrl = getEncoded(
+      normalised.keys.glintKey,
+      () => encodeAlphaToDataUrl(glint, normalised.pixelWidth, normalised.pixelHeight),
+    );
+    mapUrl = getEncoded(
+      normalised.keys.mapUrlKey,
+      () => encodePixelsToDataUrl(
+        map.pixels,
+        normalised.pixelWidth,
+        normalised.pixelHeight,
+        normalised.rasterScale,
+      ),
+      map.maxInside,
+    );
+    if (!maskUrl || !ringUrl || !glintUrl || !mapUrl) return null;
+  }
 
   return {
-    maskUrl: options.skipDataUrl ? '' : renderAlphaToDataUrl(coverage, pixelWidth, pixelHeight),
-    ringUrl: options.skipDataUrl ? '' : renderAlphaToDataUrl(ring, pixelWidth, pixelHeight),
-    glintUrl: options.skipDataUrl ? '' : renderAlphaToDataUrl(glint, pixelWidth, pixelHeight),
-    mapUrl: options.skipDataUrl
-      ? ''
-      : renderPixelsToDataUrl(lens.pixels, pixelWidth, pixelHeight, rasterScale),
-    scale: lens.maxScale,
+    maskUrl,
+    ringUrl,
+    glintUrl,
+    mapUrl,
+    scale: lensDisplacementScale(clamp(options.refraction, 0, 1)),
     width: options.width,
     height: options.height,
-    pixelWidth,
-    pixelHeight,
-    edgeUsed: lens.edgeUsed,
-    maxInside: lens.maxInside,
+    pixelWidth: normalised.pixelWidth,
+    pixelHeight: normalised.pixelHeight,
+    edgeUsed: map.edgeUsed,
+    maxInside: map.maxInside,
   };
+}
+
+function storeRaster(
+  result: GlyphRaster,
+  options: GlyphRasterOptions,
+  epoch: number = cacheEpoch,
+): GlyphRaster {
+  // A task prepared before a font/cache clear must not repopulate the new
+  // epoch with stale pixels, even if it finishes afterwards.
+  if (epoch !== cacheEpoch) return result;
+  const storageKey = `${result.key}:${options.skipDataUrl ? 'raw' : 'png'}`;
+  const existing = cache.get(storageKey);
+  if (existing) {
+    stats.hits++;
+    cache.delete(storageKey);
+    cache.set(storageKey, existing);
+    return existing;
+  }
+  stats.generated++;
+  cache.set(storageKey, result);
+  stats.bytes += rasterBytes(result);
+  while (cache.size > GLYPH_RASTER_CACHE_LIMIT || stats.bytes > GLYPH_RASTER_CACHE_BYTES) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    stats.bytes -= rasterBytes(cache.get(oldest)!);
+    cache.delete(oldest);
+    stats.evictions++;
+  }
+  stats.size = cache.size;
+  observer?.(result);
+  return result;
 }
 
 /**
@@ -791,29 +1116,156 @@ export function generateGlyphRaster(options: GlyphRasterOptions): GlyphRaster | 
   if (typeof document === 'undefined') return null;
 
   stats.misses++;
+  const prepared = prepareGlyphCoverage(options);
+  if (!prepared) return null;
+
   let raster: Omit<GlyphRaster, 'key'> | null;
   try {
-    raster = rasteriseGlyph(options);
+    raster = rasteriseWithCoverage(options, prepared.coverage, prepared.normalised);
   } catch {
     return null;
   }
   if (!raster) return null;
-  // Failed PNG generation must not be cached or hide the readable fallback.
-  if (!options.skipDataUrl && (!raster.maskUrl || !raster.ringUrl || !raster.glintUrl || !raster.mapUrl)) return null;
+  return storeRaster({ key, ...raster }, options, prepared.normalised.epoch);
+}
 
-  const result: GlyphRaster = { key, ...raster };
-  stats.generated++;
+/**
+ * Same raster path with a coverage buffer that was already rasterised (the
+ * worker fallback / a caller that kept the canvas readback).
+ */
+export function generateGlyphRasterFromCoverage(
+  options: GlyphRasterOptions,
+  coverage: Uint8ClampedArray,
+): GlyphRaster | null {
+  const key = glyphRasterCacheKey(options);
+  const storageKey = `${key}:${options.skipDataUrl ? 'raw' : 'png'}`;
+  const cached = cache.get(storageKey);
+  if (cached) {
+    stats.hits++;
+    cache.delete(storageKey);
+    cache.set(storageKey, cached);
+    return cached;
+  }
+  if (typeof document === 'undefined') return null;
+
+  stats.misses++;
+  const normalised = normaliseGlyphRaster(options);
+  let raster: Omit<GlyphRaster, 'key'> | null;
+  try {
+    raster = rasteriseWithCoverage(options, coverage, normalised);
+  } catch {
+    return null;
+  }
+  if (!raster) return null;
+  return storeRaster({ key, ...raster }, options, normalised.epoch);
+}
+
+/**
+ * Worker-fallback entry: the keys/epoch were captured when the job was
+ * submitted, so a font reload in between cannot remap this glyph to the new
+ * font's layer cache.
+ */
+export function generateGlyphRasterFromPrepared(
+  options: GlyphRasterOptions,
+  coverage: Uint8ClampedArray,
+  normalised: NormalisedGlyphRaster,
+): GlyphRaster | null {
+  const key = glyphRasterCacheKey(options);
+  const storageKey = `${key}:${options.skipDataUrl ? 'raw' : 'png'}`;
+  const cached = cache.get(storageKey);
+  if (cached) {
+    stats.hits++;
+    cache.delete(storageKey);
+    cache.set(storageKey, cached);
+    return cached;
+  }
+  if (typeof document === 'undefined') return null;
+
+  stats.misses++;
+  let raster: Omit<GlyphRaster, 'key'> | null;
+  try {
+    raster = rasteriseWithCoverage(options, coverage, normalised);
+  } catch {
+    return null;
+  }
+  if (!raster) return null;
+  return storeRaster({ key, ...raster }, options, normalised.epoch);
+}
+
+/**
+ * Cache-only lookup for the high-frequency path. If every encoded layer is
+ * already present (typical while dragging refraction), the raster is
+ * assembled without touching EDT, font rasterisation or the canvas encoder.
+ * Returns null without side effects when a layer is missing.
+ */
+export function previewGlyphRaster(options: GlyphRasterOptions): GlyphRaster | null {
+  const key = glyphRasterCacheKey(options);
+  const storageKey = `${key}:${options.skipDataUrl ? 'raw' : 'png'}`;
+  const cached = cache.get(storageKey);
+  if (cached) {
+    stats.hits++;
+    cache.delete(storageKey);
+    cache.set(storageKey, cached);
+    return cached;
+  }
+  if (options.skipDataUrl || typeof document === 'undefined') return null;
+
+  const normalised = normaliseGlyphRaster(options);
+  const parts = lookupEncodedParts(normalised);
+  if (!parts) return null;
+  const mapEntry = peekEncoded(normalised.keys.mapUrlKey);
+  const result: GlyphRaster = {
+    key,
+    ...parts,
+    scale: lensDisplacementScale(clamp(options.refraction, 0, 1)),
+    width: options.width,
+    height: options.height,
+    pixelWidth: normalised.pixelWidth,
+    pixelHeight: normalised.pixelHeight,
+    edgeUsed: lensEdgePixels(options.depth, normalised.quality),
+    maxInside: mapEntry?.maxInside ?? 0,
+  };
+  // Assembled from already-generated layers: count it as a hit, not a new
+  // rasterisation, and keep it for the next exact lookup.
+  stats.hits++;
   cache.set(storageKey, result);
   stats.bytes += rasterBytes(result);
   while (cache.size > GLYPH_RASTER_CACHE_LIMIT || stats.bytes > GLYPH_RASTER_CACHE_BYTES) {
     const oldest = cache.keys().next().value;
-    if (oldest !== undefined) {
-      stats.bytes -= rasterBytes(cache.get(oldest)!);
-      cache.delete(oldest);
-      stats.evictions++;
-    }
+    if (oldest === undefined) break;
+    stats.bytes -= rasterBytes(cache.get(oldest)!);
+    cache.delete(oldest);
+    stats.evictions++;
   }
   stats.size = cache.size;
-  observer?.(result);
   return result;
+}
+
+/**
+ * Adopts a raster produced by the worker (or any external encoder): stores it
+ * in the exact-result LRU and registers its PNGs in the split caches so later
+ * refraction changes can preview without a round trip.
+ */
+export function retainGlyphRaster(
+  result: GlyphRaster,
+  options: GlyphRasterOptions,
+  epoch?: number,
+): GlyphRaster {
+  // A worker reply that was in flight across a font reload belongs to the
+  // previous epoch: hand it back to the caller but never cache it.
+  if (epoch !== undefined && epoch !== cacheEpoch) return result;
+  const normalised = normaliseGlyphRaster(options);
+  const putEncoded = (key: string, url: string, maxInside?: number): void => {
+    if (!url || encodedCache.has(key)) return;
+    layerPut(encodedCache, key, {
+      url,
+      bytes: url.length * 2,
+      ...(maxInside === undefined ? null : { maxInside }),
+    }, encodedMeter);
+  };
+  putEncoded(normalised.keys.maskKey, result.maskUrl);
+  putEncoded(normalised.keys.ringKey, result.ringUrl);
+  putEncoded(normalised.keys.glintKey, result.glintUrl);
+  putEncoded(normalised.keys.mapUrlKey, result.mapUrl, result.maxInside);
+  return storeRaster(result, options);
 }

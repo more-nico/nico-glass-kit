@@ -1,6 +1,7 @@
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -27,6 +28,10 @@ import { observeResize } from './observeResize';
 import { subscribeSurfacePointer } from './surfacePointer';
 import { useGlassDpr } from './useGlassDpr';
 import { cancelGlassFrame, requestGlassFrame } from './animationFrame';
+import { useGlassRenderMember } from './GlassRenderGroup';
+import { defaultGlyphRasterScale } from './glyphLensMap';
+
+const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /**
  * Prebuilt glyph tile (see `glyphLensMap.ts` / `GlassText`). When present the
@@ -165,7 +170,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
   // NOTE: offsetWidth/Height (border box) — contentRect would exclude padding,
   // but backdrop-filter space is the border box, so the map must cover it all.
   const [size, setSize] = useState({ width: 0, height: 0 });
-  useEffect(() => {
+  useClientLayoutEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     let previousWidth = -1;
@@ -218,7 +223,7 @@ export function GlassSurface(props: GlassSurfaceProps) {
     : resolvedQuality !== 'low' && size.width >= 2 && size.height >= 2;
   // hoverBrightnessBoost forces a private filter: a shared entry would leak
   // the boosted slopes to every element with identical geometry.
-  const { filterId, baseScaleRef, setFilterScale, setFilterBrightness } = useGlassFilter({
+  const { filterId, specRef, baseScaleRef, setFilterScale, setFilterBrightness } = useGlassFilter({
     enabled: needsFilter,
     shared: hoverBrightnessBoost <= 0 &&
       (resolvedQuality === 'medium' || resolvedElasticity <= 0 || material.refraction === 0),
@@ -238,6 +243,12 @@ export function GlassSurface(props: GlassSurfaceProps) {
     brightness: material.brightness,
     animateBrightness: hoverBrightnessBoost > 0,
     dispersion: resolvedQuality === 'high' ? material.dispersion : 0,
+  });
+  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${material.brightness})`;
+  const setRenderActive = useGlassRenderMember({
+    element: containerRef, effect: effectRef, spec: specRef, filterId, glyph,
+    backdrop: resolvedQuality !== 'low' && filterId ? `url(#${filterId})` : lowBackdrop,
+    radius: cornerRadius, raster: dpr * (hasGlyph ? defaultGlyphRasterScale(provider.lensMapRasterScale) : provider.lensMapRasterScale),
   });
 
   const applyHoverBrightness = (active: boolean) => {
@@ -327,10 +338,14 @@ export function GlassSurface(props: GlassSurfaceProps) {
         [state.ty, state.vty] = step(state.ty, state.vty, state.targetTy);
         apply();
         state.raf = active ? requestGlassFrame(tick) : 0;
+        if (!active) setRenderActive('spring', false);
       };
 
       start = () => {
-        if (state && !state.raf) state.raf = requestGlassFrame(tick);
+        if (state && !state.raf) {
+          setRenderActive('spring', true);
+          state.raf = requestGlassFrame(tick);
+        }
       };
     }
 
@@ -359,11 +374,12 @@ export function GlassSurface(props: GlassSurfaceProps) {
       if (state) {
         if (state.raf) cancelGlassFrame(state.raf);
         motion.style.transform = '';
-        setFilterScale(base);
+        setFilterScale(baseScaleRef.current);
+        setRenderActive('spring', false);
         if (springRef.current === state) springRef.current = null;
       }
     };
-  }, [resolvedQuality, filterId, resolvedElasticity, groupRegister, baseScaleRef, setFilterScale]);
+  }, [resolvedQuality, filterId, resolvedElasticity, groupRegister, baseScaleRef, setFilterScale, material.refraction, glyphScale, setRenderActive]);
 
   // Directional rim light (all tiers, pure CSS vars): the specular glint
   // tracks the pointer; fades back to a uniform rim when the pointer leaves.
@@ -406,7 +422,6 @@ export function GlassSurface(props: GlassSurfaceProps) {
     };
   }, [highlightIntensity]);
 
-  const lowBackdrop = `blur(${material.blur}px) saturate(${material.saturation}%) brightness(${material.brightness})`;
   const effectStyle: CSSProperties =
     resolvedQuality !== 'low' && filterId
       ? { backdropFilter: `url(#${filterId})` }
@@ -444,11 +459,13 @@ export function GlassSurface(props: GlassSurfaceProps) {
       data-ngs-shape={glyph ? 'glyph' : undefined}
       style={surfaceStyle}
       onPointerEnter={(e: ReactPointerEvent<HTMLElement>) => {
+        setRenderActive('pointer', true);
         if (hoverBrightnessBoost > 0) applyHoverBrightness(true);
         onPointerEnter?.(e);
       }}
       onPointerLeave={(e: ReactPointerEvent<HTMLElement>) => {
         if (hoverBrightnessBoost > 0) applyHoverBrightness(false);
+        setRenderActive('pointer', false);
         onPointerLeave?.(e);
       }}
     >

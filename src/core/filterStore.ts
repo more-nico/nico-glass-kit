@@ -28,7 +28,7 @@ export function createFilterStore(namespace: string) {
     pending = true;
     queueMicrotask(() => {
       pending = false;
-      snapshot = [...entries.values()].map(value => value.entry);
+      snapshot = [...keys].map(([, key]) => entries.get(key)!.entry);
       for (const listener of listeners) listener();
     });
   };
@@ -61,6 +61,25 @@ export function createFilterStore(namespace: string) {
         mapUrl: spec.mapUrl,
         width: spec.width,
         height: spec.height,
+        region: lensRegionPercent(spec.width, spec.height, descriptor.regionPaddingPx),
+      };
+      entries.delete(key);
+      entries.set(spec.key, { entry, count: 1 });
+      keys.set(id, spec.key);
+      publish();
+      return true;
+    },
+    /** Retune a singly owned graph; shared entries remain immutable. */
+    update(id: string, spec: GlassFilterSpec): boolean {
+      const key = keys.get(id);
+      if (key === undefined) return false;
+      const existing = entries.get(key)!;
+      if (existing.count !== 1 || (spec.key !== key && entries.has(spec.key))) return false;
+      const descriptor = createLensFilter(spec);
+      const entry: FilterEntry = {
+        id, mapUrl: spec.mapUrl, width: spec.width, height: spec.height,
+        passes: descriptor.passes,
+        ratios: lensPassScaleRatios(descriptor.passes, spec.scale),
         region: lensRegionPercent(spec.width, spec.height, descriptor.regionPaddingPx),
       };
       entries.delete(key);

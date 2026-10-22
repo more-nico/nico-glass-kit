@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.4.0 — 2026-10-23
+
+### Performance
+
+- Add opt-in `GlassRenderGroup` spatial batching for compatible, disjoint
+  surfaces. Preserve individual tints, highlights and content; interactive,
+  overlapping and unsupported surfaces retain independent filters.
+- Keep retained content spinners from suspending an entire render group;
+  layout animation and motion of the glass itself still restore private filters.
+- Retune private optical graphs without replacing their IDs, and retain SVG
+  node order across geometry updates. Subscribe to surface dimensions before
+  paint so early render-group observers cannot consume the initial resize.
+- Split glyph coverage, distance-field, map and outline caches; compute exact
+  glyph maps and PNGs with a lazy two-worker latest-task queue, with equivalent
+  synchronous APIs and a fallback when workers are unavailable.
+- Keep in-flight glyph jobs isolated across font-cache resets, including font
+  swaps whose measured glyph dimensions stay the same.
+- Share those workers with rounded-surface optical map updates, preserving
+  synchronous first maps and size/DPR changes. Keep strength and graph-only
+  material changes independent of raster jobs; reject stale optical results.
+- Resample cached same-tier glyphs during size changes, replace exact results
+  atomically, prepare initial outlines eagerly, and prewarm later offscreen
+  updates within one viewport of visibility.
+- Coalesce playground pointer/material input, isolate FPS bookkeeping from
+  background invalidation, and bound automatic light sampling per frame.
+
+### Validation
+
+- Add a real production-playground benchmark with independent native scroll
+  frame-sequence counters, missing-content checks and reproducible AB runs.
+  Highest-quality 60 fps remains an acceptance target, not a guarantee.
+- Preserve archived evidence and frozen pixel fixtures. Add batching,
+  interaction ownership, worker cancellation and cache-budget regressions.
+- Consolidate repeated test cases and keep performance experiments optional;
+  retain one native-scroll benchmark and package-consumer checks for workers.
+- Record the local M4 implementation and unmet frame-rate/content-completeness
+  targets in [the performance report](benchmarks/report-m4-60fps.md).
+
 ## 0.3.4 — 2026-10-22
 
 ### Fixed

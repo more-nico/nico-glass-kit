@@ -1,174 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { decideScrollProbe, isInternalMutation, isLightFlipMutation } from './backdropProbeScheduler';
+import { classifyMutations, decideScrollProbe } from './backdropProbeScheduler';
 
-/* ------------------------------------------------------------------ */
-/* isInternalMutation                                                  */
-/* ------------------------------------------------------------------ */
-
-interface FakeElementOptions {
-  /** Value of the nearest data-ngs-internal zone, null for none. */
-  zone: string | null;
+function element(zone: string | null = null): Element {
+  return { closest: () => zone === null ? null : { getAttribute: () => zone } } as unknown as Element;
+}
+function mutation(target: Element, attributeName?: string): MutationRecord {
+  return { target, attributeName, type: attributeName ? 'attributes' : 'childList' } as unknown as MutationRecord;
 }
 
-function fakeElement({ zone }: FakeElementOptions): Element {
-  const zoneNode = zone === null ? null : { getAttribute: () => zone };
-  return {
-    closest: (selector: string) => (selector === '[data-ngs-internal]' ? zoneNode : null),
-  } as unknown as Element;
-}
+describe('paint invalidation', () => {
+  const page = element(), layer = element('style'), registry = element('all');
 
-function mutation(
-  type: MutationRecordType,
-  target: Element,
-  attributeName?: string,
-): MutationRecord {
-  return { type, target, attributeName } as unknown as MutationRecord;
-}
-
-describe('isInternalMutation', () => {
-  it('mutes style writes inside a layer zone', () => {
-    const el = fakeElement({ zone: 'style' });
-    expect(isInternalMutation(mutation('attributes', el, 'style'))).toBe(true);
+  it('ignores internal bookkeeping without swallowing real paint changes', () => {
+    const internal = [mutation(layer, 'style'), mutation(registry),
+      ...['data-ngs-render-batched', 'data-ngs-individual-filter', 'data-ngs-render-batches', 'data-ngs-render-members']
+        .map(name => mutation(page, name))];
+    expect(classifyMutations(internal)).toEqual({ real: false, lightFlip: false, urgent: false });
+    for (const change of [mutation(page), mutation(page, 'class'), mutation(page, 'data-ngs-render-batched-extra')]) {
+      expect(classifyMutations([...internal, change])).toEqual({ real: true, lightFlip: false, urgent: true });
+    }
   });
 
-  it('lets class swaps and data-ngs-light flips through a layer zone', () => {
-    const el = fakeElement({ zone: 'style' });
-    expect(isInternalMutation(mutation('attributes', el, 'class'))).toBe(false);
-    expect(isInternalMutation(mutation('attributes', el, 'data-ngs-light'))).toBe(false);
-    expect(isInternalMutation(mutation('childList', el))).toBe(false);
-  });
-
-  it('mutes everything inside the registry zone', () => {
-    const el = fakeElement({ zone: 'all' });
-    expect(isInternalMutation(mutation('attributes', el, 'style'))).toBe(true);
-    expect(isInternalMutation(mutation('attributes', el, 'scale'))).toBe(true);
-    expect(isInternalMutation(mutation('attributes', el, 'class'))).toBe(true);
-    expect(isInternalMutation(mutation('childList', el))).toBe(true);
-  });
-
-  it('lets page mutations through untouched', () => {
-    const el = fakeElement({ zone: null });
-    expect(isInternalMutation(mutation('attributes', el, 'style'))).toBe(false);
-    expect(isInternalMutation(mutation('attributes', el, 'class'))).toBe(false);
-    expect(isInternalMutation(mutation('childList', el))).toBe(false);
+  it('defers tint-only transitions but keeps simultaneous page paint urgent', () => {
+    const flip = mutation(page, 'data-ngs-light');
+    expect(classifyMutations([flip])).toEqual({ real: true, lightFlip: true, urgent: false });
+    expect(classifyMutations([flip, mutation(page, 'style')])).toEqual({ real: true, lightFlip: true, urgent: false });
+    expect(classifyMutations([flip, mutation(page, 'class')])).toEqual({ real: true, lightFlip: true, urgent: true });
   });
 });
 
-/* ------------------------------------------------------------------ */
-/* isLightFlipMutation                                                 */
-/* ------------------------------------------------------------------ */
+describe('scroll invalidation', () => {
+  const rect = { top: 100, left: 200, width: 80, height: 40 };
+  const doc = {}, inner = {};
+  const last = { rect, offsets: new Map([[doc, { top: 0, left: 0 }]]) };
 
-describe('isLightFlipMutation', () => {
-  it('matches the data-ngs-light attribute flip', () => {
-    const el = fakeElement({ zone: null });
-    expect(isLightFlipMutation(mutation('attributes', el, 'data-ngs-light'))).toBe(true);
+  it.each([
+    { name: 'down', top: 60, left: 200, scrollTop: 40, scrollLeft: 0, coMoving: true },
+    { name: 'up', top: 140, left: 200, scrollTop: -40, scrollLeft: 0, coMoving: true },
+    { name: 'right', top: 100, left: 170, scrollTop: 0, scrollLeft: 30, coMoving: true },
+    { name: 'left', top: 100, left: 230, scrollTop: 0, scrollLeft: -30, coMoving: true },
+    { name: 'fixed', top: 100, left: 200, scrollTop: 40, scrollLeft: 0, coMoving: false },
+    { name: 'sticky', top: 80, left: 200, scrollTop: 40, scrollLeft: 0, coMoving: false },
+    { name: 'wrong translation sign', top: 140, left: 200, scrollTop: 40, scrollLeft: 0, coMoving: false },
+  ])('$name only skips independently proven co-moving paint', test => {
+    const input = { rect: { ...rect, top: test.top, left: test.left }, last,
+      offsets: new Map([[doc, { top: test.scrollTop, left: test.scrollLeft }]]), intersects: () => true };
+    expect(decideScrollProbe(input)).toBe(true); // A fixed wallpaper remains possible.
+    expect(decideScrollProbe({ ...input, paintMovesWithContent: () => true })).toBe(!test.coMoving);
   });
 
-  it('ignores other attributes and childList changes', () => {
-    const el = fakeElement({ zone: null });
-    expect(isLightFlipMutation(mutation('attributes', el, 'style'))).toBe(false);
-    expect(isLightFlipMutation(mutation('attributes', el, 'class'))).toBe(false);
-    expect(isLightFlipMutation(mutation('childList', el))).toBe(false);
-  });
-});
-
-/* ------------------------------------------------------------------ */
-/* decideScrollProbe                                                   */
-/* ------------------------------------------------------------------ */
-
-const RECT = { top: 100, left: 200, width: 80, height: 40 };
-const DOC = { id: 'document' };
-
-function decide(input: Partial<Parameters<typeof decideScrollProbe>[0]>): boolean {
-  const {
-    rect = RECT,
-    last = null,
-    offsets = new Map(),
-    intersects = () => true,
-  } = input;
-  return decideScrollProbe({ rect, last, offsets, intersects });
-}
-
-describe('decideScrollProbe', () => {
-  it('does nothing when no scroller moved', () => {
-    expect(decide({ offsets: new Map() })).toBe(false);
-  });
-
-  it('probes a first-seen scroller only when it overlaps the element', () => {
-    const offsets = new Map([[DOC, { top: 10, left: 0 }]]);
-    expect(decide({ offsets, intersects: () => true })).toBe(true);
-    expect(decide({ offsets, intersects: () => false })).toBe(false);
-  });
-
-  it('skips scrollers that did not move since the baseline', () => {
-    const last = {
-      rect: RECT,
-      offsets: new Map([[DOC, { top: 10, left: 0 }]]),
-    };
-    expect(decide({ last, offsets: new Map([[DOC, { top: 10, left: 0 }]]) })).toBe(false);
-  });
-
-  it('skips elements that moved along with the scrolled content', () => {
-    const last = {
-      rect: { top: 100, left: 200, width: 80, height: 40 },
-      offsets: new Map([[DOC, { top: 0, left: 0 }]]),
-    };
-    // Document scrolled down 40, element moved down exactly 40: in-flow.
-    const rect = { top: 140, left: 200, width: 80, height: 40 };
-    expect(
-      decide({
-        rect,
-        last,
-        offsets: new Map([[DOC, { top: 40, left: 0 }]]),
-      }),
-    ).toBe(false);
-  });
-
-  it('probes anchored elements over a scrolling overlapping scroller', () => {
-    const last = {
-      rect: RECT,
-      offsets: new Map([[DOC, { top: 0, left: 0 }]]),
-    };
-    // Element stayed put (fixed) while the document scrolled.
-    expect(
-      decide({
-        rect: RECT,
-        last,
-        offsets: new Map([[DOC, { top: 40, left: 0 }]]),
-        intersects: () => true,
-      }),
-    ).toBe(true);
-  });
-
-  it('skips anchored elements when the scroller is elsewhere', () => {
-    const last = {
-      rect: RECT,
-      offsets: new Map([[DOC, { top: 0, left: 0 }]]),
-    };
-    expect(
-      decide({
-        rect: RECT,
-        last,
-        offsets: new Map([[DOC, { top: 40, left: 0 }]]),
-        intersects: () => false,
-      }),
-    ).toBe(false);
-  });
-
-  it('probes conservatively when the rect changed beyond a translation', () => {
-    const last = {
-      rect: RECT,
-      offsets: new Map([[DOC, { top: 0, left: 0 }]]),
-    };
-    // Size changed (layout shift): not moved-with, not anchored.
-    const rect = { top: 110, left: 200, width: 120, height: 40 };
-    expect(
-      decide({
-        rect,
-        last,
-        offsets: new Map([[DOC, { top: 40, left: 0 }]]),
-        intersects: () => false,
-      }),
-    ).toBe(true);
+  it('skips unrelated/unchanged scrollers and keeps ambiguous nested movement conservative', () => {
+    const input = { rect, last, offsets: new Map([[doc, { top: 0, left: 0 }]]), intersects: () => true };
+    expect(decideScrollProbe(input)).toBe(false);
+    expect(decideScrollProbe({ ...input, last: null, offsets: new Map([[doc, { top: 30, left: 0 }]]), intersects: () => false })).toBe(false);
+    const offsets = new Map([[doc, { top: 40, left: 0 }], [inner, { top: 30, left: 0 }]]);
+    const nestedLast = { rect, offsets: new Map([[doc, { top: 0, left: 0 }], [inner, { top: 0, left: 0 }]]) };
+    expect(decideScrollProbe({ ...input, rect: { ...rect, top: 30 }, last: nestedLast, offsets,
+      paintMovesWithContent: () => true })).toBe(true);
   });
 });

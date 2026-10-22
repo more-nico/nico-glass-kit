@@ -10,6 +10,12 @@ import { glassProps } from './demos/demoProps';
  * frame rate it reports. That is a deliberate, accepted trade-off. All
  * per-frame bookkeeping stays in refs: the text/canvas update at 4 Hz via
  * direct DOM mutation, never React re-renders.
+ *
+ * The HUD row is marked `data-ngs-internal="all"` because those 4 Hz text and
+ * `data-level` writes are not backdrop changes. Without the marker the shared
+ * probe scheduler sees childList/attribute records every 250 ms and starts an
+ * urgent nine-point re-probe of every auto surface. The marker covers only
+ * this HUD, so page paint changes still reach the scheduler normally.
  */
 
 const WINDOW_FRAMES = 180; // ~3 s of frame deltas at 60 Hz
@@ -58,6 +64,11 @@ export function FpsMeter({ params }: { params: DemoParams }) {
     let raf = 0;
     let last = 0;
     let lastUpdate = 0;
+    // The initial JSX already renders `--` / `data-level="good"`. Skip writes
+    // that would not change the DOM; the observer marker handles the rest.
+    let lastFps = -1;
+    let lastP95 = -1;
+    let lastLevel: Level = 'good';
 
     const drawGraph = () => {
       // The surface sets data-ngs-light; mirror its palette so bars stay
@@ -106,10 +117,20 @@ export function FpsMeter({ params }: { params: DemoParams }) {
       const sorted = Array.from(frames.subarray(0, count)).sort((a, b) => a - b);
       const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
 
-      if (fpsRef.current) fpsRef.current.textContent = String(fps);
-      if (msRef.current) msRef.current.textContent = `p95 ${p95.toFixed(1)}ms`;
+      if (fps !== lastFps) {
+        if (fpsRef.current) fpsRef.current.textContent = String(fps);
+        lastFps = fps;
+      }
+      if (p95 !== lastP95) {
+        if (msRef.current) msRef.current.textContent = `p95 ${p95.toFixed(1)}ms`;
+        lastP95 = p95;
+      }
+      const level = levelFor(p95);
       const root = rootRef.current;
-      if (root) root.dataset.level = levelFor(p95);
+      if (root && level !== lastLevel) {
+        root.dataset.level = level;
+        lastLevel = level;
+      }
       drawGraph();
     };
 
@@ -119,7 +140,16 @@ export function FpsMeter({ params }: { params: DemoParams }) {
 
   return (
     <GlassCard className="pg-fps" padding="8px 12px" cornerRadius={999} {...glassProps(params)}>
-      <div className="pg-fps-row" ref={rootRef} data-level="good" aria-hidden="true">
+      {/* Keep the 4 Hz HUD writes out of the backdrop-probe mutation stream.
+          This only mutes mutations inside this row; real page changes still
+          reach the scheduler outside it. */}
+      <div
+        className="pg-fps-row"
+        ref={rootRef}
+        data-level="good"
+        data-ngs-internal="all"
+        aria-hidden="true"
+      >
         <span className="pg-fps-num" ref={fpsRef}>
           --
         </span>

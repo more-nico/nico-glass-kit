@@ -1,4 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react';
+import { useFrameValue } from '../useFrameValue';
 
 interface DragState {
   pointerId: number;
@@ -11,6 +12,7 @@ interface DragState {
 /** Pointer-capture drag; returns offset + handlers for the draggable element. */
 export function useDrag() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const updatePosition = useFrameValue(setPos);
   const drag = useRef<DragState | null>(null);
 
   const onPointerDown = (e: PointerEvent<HTMLElement>) => {
@@ -27,7 +29,7 @@ export function useDrag() {
   const onPointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = drag.current;
     if (!d || e.pointerId !== d.pointerId) return;
-    setPos({ x: d.baseX + e.clientX - d.startX, y: d.baseY + e.clientY - d.startY });
+    updatePosition({ x: d.baseX + e.clientX - d.startX, y: d.baseY + e.clientY - d.startY });
   };
 
   const end = (e: PointerEvent<HTMLElement>) => {
