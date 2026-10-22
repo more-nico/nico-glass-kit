@@ -280,8 +280,10 @@ export function submitGlyphRasterJob(
 
   const options = requests.map(requestToOptions);
   const epoch = glyphRasterCacheEpoch();
+  // A font reload can change coverage without changing any glyph metrics.
+  // Never retarget an in-flight task from the previous cache epoch.
   const signature = JSON.stringify(
-    requests.map((request) => [request.key, request.pixelWidth, request.pixelHeight]),
+    requests.map((request) => [request.key, request.epoch, request.pixelWidth, request.pixelHeight]),
   );
   getScheduler().submit({
     owner,

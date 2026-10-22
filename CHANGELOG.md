@@ -15,6 +15,8 @@
 - Split glyph coverage, distance-field, map and outline caches; compute exact
   glyph maps and PNGs with a lazy two-worker latest-task queue, with equivalent
   synchronous APIs and a fallback when workers are unavailable.
+- Keep in-flight glyph jobs isolated across font-cache resets, including font
+  swaps whose measured glyph dimensions stay the same.
 - Share those workers with rounded-surface optical map updates, preserving
   synchronous first maps and size/DPR changes. Keep strength and graph-only
   material changes independent of raster jobs; reject stale optical results.
