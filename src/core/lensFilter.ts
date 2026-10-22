@@ -158,9 +158,11 @@ export function createLensFilter(options: LensFilterOptions): LensFilterDescript
 }
 
 export function lensChannelMatrix(channel: 'r' | 'g' | 'b'): string {
-  if (channel === 'r') return '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1';
-  if (channel === 'g') return '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 0 1';
-  return '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 0 1';
+  // Preserve displaced coverage: forcing alpha to 1 turns out-of-bounds
+  // transparent samples into black blocks, especially while a surface resizes.
+  if (channel === 'r') return '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0';
+  if (channel === 'g') return '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0';
+  return '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0';
 }
 
 /** SVG saturation matrix (Rec. 709 luminance weights), `amount` 1 = unchanged. */

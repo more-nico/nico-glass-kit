@@ -81,12 +81,20 @@ describe('matrices', () => {
     expect(values).toEqual([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]);
   });
 
-  it('keeps the alpha row for every channel matrix', () => {
+  it('extracts each RGB channel without making transparent samples opaque', () => {
     for (const channel of ['r', 'g', 'b'] as const) {
       const values = lensChannelMatrix(channel).split(/\s+/).map(Number);
       expect(values).toHaveLength(20);
-      expect(values[19]).toBe(1); // alpha passthrough
-      expect(values[18]).toBe(0);
+      const selected = { r: 0, g: 1, b: 2 }[channel];
+      for (const alpha of [0, 0.25, 0.5, 1]) {
+        const input = [0.2, 0.4, 0.8, alpha, 1];
+        const output = Array.from({ length: 4 }, (_, row) =>
+          input.reduce((sum, value, column) => sum + values[row * 5 + column] * value, 0),
+        );
+        const expected = [0, 0, 0, alpha];
+        expected[selected] = input[selected];
+        expect(output).toEqual(expected);
+      }
     }
   });
 });

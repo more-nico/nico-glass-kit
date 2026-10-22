@@ -1,6 +1,20 @@
 import type { MessageKey } from './zh';
 
 export const en = {
+  'dock.description': 'A glass dock with hover labels and a naturally resizing shell',
+  'dock.aria': 'Page navigation demo',
+  'dock.hint': 'Move between icons or click + to add pages. Arrow keys move focus, too.',
+  'dock.current': 'Current page: {name}',
+  'dock.reset': 'Reset',
+  'dock.add': 'Add page',
+  'dock.page.home': 'Home',
+  'dock.page.work': 'Work & productivity',
+  'dock.page.design': 'Design',
+  'dock.page.reading': 'Reading & saved for later',
+  'dock.page.development': 'Developer tools',
+  'dock.page.life': 'Life',
+  'dock.page.extra': 'New page {number}',
+
   'app.documentTitle': 'nico-glass-kit · Nico Glass Playground',
   'app.footer':
     'nico-glass-kit · three quality tiers Low / Medium / High · refraction on Chromium, other browsers fall back automatically',

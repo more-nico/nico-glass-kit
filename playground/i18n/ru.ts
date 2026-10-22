@@ -1,6 +1,20 @@
 import type { MessageKey } from './zh';
 
 export const ru = {
+  'dock.description': 'Стеклянная панель Dock с раскрывающимися названиями и плавным изменением ширины',
+  'dock.aria': 'Пример навигации по страницам',
+  'dock.hint': 'Перемещайте указатель между значками или добавляйте страницы кнопкой +. Стрелки перемещают фокус.',
+  'dock.current': 'Текущая страница: {name}',
+  'dock.reset': 'Сбросить',
+  'dock.add': 'Добавить страницу',
+  'dock.page.home': 'Главная',
+  'dock.page.work': 'Работа и продуктивность',
+  'dock.page.design': 'Дизайн',
+  'dock.page.reading': 'Чтение и отложенные статьи',
+  'dock.page.development': 'Инструменты разработки',
+  'dock.page.life': 'Жизнь',
+  'dock.page.extra': 'Новая страница {number}',
+
   'app.documentTitle': 'nico-glass-kit · Nico Glass Playground',
   'app.footer':
     'nico-glass-kit · три уровня качества Low / Medium / High · преломление в Chromium, остальные браузеры переключаются автоматически',

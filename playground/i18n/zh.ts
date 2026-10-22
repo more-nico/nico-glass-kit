@@ -1,4 +1,18 @@
 export const zh = {
+  'dock.description': '悬停展开名称的玻璃 Dock，宽度随内容自然过渡',
+  'dock.aria': '页面导航示例',
+  'dock.hint': '在图标之间快速移动，或点击 + 添加页面；方向键也可切换焦点。',
+  'dock.current': '当前页面：{name}',
+  'dock.reset': '重置',
+  'dock.add': '添加页面',
+  'dock.page.home': '首页',
+  'dock.page.work': '工作与效率工具',
+  'dock.page.design': '设计',
+  'dock.page.reading': '阅读收藏和稍后处理',
+  'dock.page.development': '开发工具',
+  'dock.page.life': '生活',
+  'dock.page.extra': '新页面 {number}',
+
   'app.documentTitle': 'nico-glass-kit · Nico Glass Playground',
   'app.footer':
     'nico-glass-kit · Low / Medium / High 三档渲染 · Chromium 折射，其余浏览器自动降级',

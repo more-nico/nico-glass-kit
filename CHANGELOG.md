@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 — 2026-10-22
+
+### Added
+
+- Playground Dock demo with animated hover labels, page selection, add/reset
+  actions, keyboard navigation, responsive overflow and all five UI languages.
+  The demo follows the shared material, quality and interaction controls.
 
 ### Performance
 
@@ -35,6 +41,8 @@
 
 ### Fixed
 
+- Preserve displaced alpha in all three RGB dispersion channel matrices so
+  transparent samples do not become opaque black blocks during animated resizing.
 - Bind animation setters to their filter id so cleanup of a replaced graph
   cannot overwrite the new material's refraction scale.
 - Track DPR changes on monitor/zoom changes, including unchanged CSS dimensions.
@@ -49,6 +57,10 @@
 
 ### Tests
 
+- Add transparent and semi-transparent lens graph pixel regressions, plus
+  rapid width reversals with and without elasticity. Verify the Dock fix in
+  hardware-accelerated Edge Canary on the Nico preview and actual MV3 extension;
+  see `benchmarks/report-dock-alpha.md`.
 - Add a production benchmark with raw CPU/GPU/memory metrics, frozen lens pixel
   hashes, screenshot diffs and browser coverage for StrictMode, hover, resize,
   optics/DPR updates, glyphs, filter cleanup and fallbacks. See `benchmarks/`.

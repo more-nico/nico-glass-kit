@@ -21,6 +21,7 @@ import { BarsDemo } from './demos/BarsDemo';
 import { ButtonsDemo } from './demos/ButtonsDemo';
 import { CardDemo } from './demos/CardDemo';
 import { ControlsDemo } from './demos/ControlsDemo';
+import { DockDemo } from './demos/DockDemo';
 import { HeroDemo } from './demos/HeroDemo';
 import { IdentityDemo } from './demos/IdentityDemo';
 import { InputsDemo } from './demos/InputsDemo';
@@ -98,6 +99,7 @@ export default function App() {
           <ProgressDemo params={params} />
           <OverlayDemo params={params} />
           <TextDemo params={params} />
+          <DockDemo params={params} />
         </div>
         <GlassSurface as="footer" className="pg-footer" {...glassProps(params)}>
           <p className="pg-footer-text">{t('app.footer')}</p>

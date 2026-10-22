@@ -1,6 +1,20 @@
 import type { MessageKey } from './zh';
 
 export const ko = {
+  'dock.description': '호버하면 이름이 펼쳐지고 너비가 부드럽게 바뀌는 유리 Dock',
+  'dock.aria': '페이지 탐색 데모',
+  'dock.hint': '아이콘 사이를 이동하거나 +로 페이지를 추가하세요. 방향키로도 포커스를 이동할 수 있습니다.',
+  'dock.current': '현재 페이지: {name}',
+  'dock.reset': '초기화',
+  'dock.add': '페이지 추가',
+  'dock.page.home': '홈',
+  'dock.page.work': '업무 및 생산성 도구',
+  'dock.page.design': '디자인',
+  'dock.page.reading': '독서 및 나중에 읽기',
+  'dock.page.development': '개발 도구',
+  'dock.page.life': '일상',
+  'dock.page.extra': '새 페이지 {number}',
+
   'app.documentTitle': 'nico-glass-kit · Nico Glass Playground',
   'app.footer':
     'nico-glass-kit · Low / Medium / High 3단계 렌더링 · Chromium에서 굴절, 그 외 브라우저는 자동으로 하위 단계',

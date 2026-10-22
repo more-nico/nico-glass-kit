@@ -1,6 +1,20 @@
 import type { MessageKey } from './zh';
 
 export const ja = {
+  'dock.description': 'ホバーで名前が開き、幅がなめらかに変わるガラスの Dock',
+  'dock.aria': 'ページナビゲーションのデモ',
+  'dock.hint': 'アイコンの間を移動するか、+ でページを追加。矢印キーでもフォーカスを移動できます。',
+  'dock.current': '現在のページ：{name}',
+  'dock.reset': 'リセット',
+  'dock.add': 'ページを追加',
+  'dock.page.home': 'ホーム',
+  'dock.page.work': '仕事と効率化ツール',
+  'dock.page.design': 'デザイン',
+  'dock.page.reading': '読書とあとで読む',
+  'dock.page.development': '開発ツール',
+  'dock.page.life': '暮らし',
+  'dock.page.extra': '新しいページ {number}',
+
   'app.documentTitle': 'nico-glass-kit · Nico Glass Playground',
   'app.footer':
     'nico-glass-kit · Low / Medium / High の3段階レンダリング · Chromium では屈折、それ以外は自動で降格',
